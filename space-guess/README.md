@@ -7,6 +7,16 @@ A full-stack real-time multiplayer AI-based guessing game with a modern space-th
 - **Backend**: FastAPI + Redis (Pub/Sub & Storage) + Server-Sent Events (SSE).
 - **Frontend**: Expo React Native (Web + Mobile), Zustand, React Native Reanimated.
 - **AI**: OpenAI API for YES/NO/MAYBE responses.
+- **Deployment**: Render Blueprint (render.yaml).
+
+## Deployment (Render)
+
+> [!IMPORTANT]
+> To avoid the **"dockerfile parse error: unknown instruction: services:"** error, do NOT create a manual Web Service. Instead, use Render's **Blueprint** feature:
+> 1. Go to the Render Dashboard.
+> 2. Click **New +** -> **Blueprint**.
+> 3. Connect this repository.
+> 4. Render will use `render.yaml` to automatically set up Redis, the Backend, and the Frontend.
 
 ## Setup Instructions
 
