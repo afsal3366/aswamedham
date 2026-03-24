@@ -1,11 +1,21 @@
-# Step 1: Use an Nginx image to serve the static files
+# Stage 1: Build the Expo web app
+FROM node:20-alpine AS build
+
+WORKDIR /app
+
+# Install dependencies
+COPY package.json package-lock.json ./
+RUN npm install
+
+# Copy the rest of the code and build
+COPY . .
+RUN npx expo export --platform web
+
+# Stage 2: Serve the static files with Nginx
 FROM nginx:stable-alpine
 
-# Copy the build output from the local dist folder to the Nginx html folder
-COPY ./dist /usr/share/nginx/html
-
-# Copy a basic Nginx config to handle SPA routing (optional but recommended)
-# If you need custom redirects, you can add an nginx.conf here too.
+# Copy the build output from the builder stage
+COPY --from=build /app/dist /usr/share/nginx/html
 
 # Expose port 80
 EXPOSE 80

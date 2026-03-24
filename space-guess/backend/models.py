@@ -7,6 +7,9 @@ class RoomCreate(BaseModel):
     hide_other_player_questions: bool = False
     mode: str = "AI"
     custom_word: Optional[str] = None
+    category: Optional[str] = None
+    difficulty: Optional[str] = "medium"
+    is_single_player: bool = False
 
 class RoomJoin(BaseModel):
     room_id: str
@@ -24,7 +27,16 @@ class QuestionSubmit(BaseModel):
 class HostAnswerSubmit(BaseModel):
     room_id: str
     user_id: str
-    answer: str # YES, NO, MAYBE
+    answer: str
+
+class RoomKick(BaseModel):
+    room_id: str
+    host_id: str
+    target_user_id: str
+
+class SkipTurn(BaseModel):
+    room_id: str
+    user_id: str # The user whose turn is being skipped # YES, NO, MAYBE
 
 class GuessSubmit(BaseModel):
     room_id: str

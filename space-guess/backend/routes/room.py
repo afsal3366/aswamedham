@@ -3,6 +3,7 @@ import json
 from fastapi import APIRouter, HTTPException
 from models import RoomCreate, RoomJoin, Player
 from redis_client import RedisStore
+from ai_service import get_random_person, generate_random_word_via_ai
 
 router = APIRouter()
 
@@ -13,18 +14,24 @@ async def create_room(req: RoomCreate):
     
     redis = RedisStore.get()
     
+    # Store all mission parameters in meta for start_game to used
     meta = {
         "max_questions": req.max_questions,
         "hide_other_player_questions": str(req.hide_other_player_questions),
         "status": "lobby",
-        "question_count": 0,
+        "question_count": "0",
         "mode": req.mode.upper(),
-        "awaiting_host": "False"
+        "awaiting_host": "False",
+        "is_single_player": str(req.is_single_player),
+        "category": req.category if req.category else "",
+        "difficulty": req.difficulty if req.difficulty else "medium"
     }
     await redis.hset(f"room:{room_id}:meta", mapping=meta)
     
     if req.mode.upper() == "HOST" and req.custom_word:
         await redis.set(f"room:{room_id}:word", req.custom_word.upper(), ex=3600)
+    # AI mode word generation is deferred to start_game to allow for 
+    # category-aware generation without redundant calls here.
     
     player = Player(id=user_id, username=req.host_username, is_host=True)
     await redis.hset(f"room:{room_id}:players", user_id, player.model_dump_json())
@@ -57,4 +64,8 @@ async def join_room(req: RoomJoin):
     players_raw = await redis.hgetall(f"room:{req.room_id}:players")
     players = [json.loads(p) for p in players_raw.values()]
     
-    return {"room_id": req.room_id, "user_id": user_id, "player": player, "meta": meta, "players": players}
+    # Fetch chat history for joining players
+    chat_raw = await redis.lrange(f"room:{req.room_id}:chat", 0, -1)
+    messages = [json.loads(m) for m in chat_raw]
+    
+    return {"room_id": req.room_id, "user_id": user_id, "player": player, "meta": meta, "players": players, "messages": messages}

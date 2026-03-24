@@ -25,3 +25,7 @@ app.include_router(router)
 @app.get("/")
 def read_root():
     return {"status": "ok", "message": "Space 20 Questions API"}
+
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}

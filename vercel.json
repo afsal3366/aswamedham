@@ -1,8 +1,11 @@
 {
+    "outputDirectory": "space-guess/frontend/dist",
+    "trailingSlash": false,
+    "cleanUrls": true,
     "rewrites": [
         {
             "source": "/(.*)",
-            "destination": "/space-guess/frontend/dist/index.html"
+            "destination": "/index.html"
         }
     ]
 }

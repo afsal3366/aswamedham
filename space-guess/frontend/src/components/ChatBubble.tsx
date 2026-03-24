@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { colors, typography } from '../theme/colors';
-import { ChatMessage } from '../store/gameStore';
+import { ChatMessage, useGameStore } from '../store/gameStore';
 
 interface Props {
     message: ChatMessage;
@@ -10,9 +10,24 @@ interface Props {
 }
 
 export const ChatBubble: React.FC<Props> = ({ message, isOwnMsg }) => {
+    const { userColors } = useGameStore();
     const isAI = message.type === 'answer';
     const isSystem = message.type === 'system';
     const isGuess = message.type === 'guess';
+
+    const userColor = userColors[message.user_id] || colors.textMuted;
+
+    // Semantic colors for answers
+    const getAnswerStyle = () => {
+        if (!isAI) return null;
+        const text = message.message.toUpperCase();
+        if (text.includes('YES')) return { borderColor: '#39FF14', shadowColor: '#39FF14', backgroundColor: 'rgba(57, 255, 20, 0.1)' };
+        if (text.includes('NO')) return { borderColor: '#FF3131', shadowColor: '#FF3131', backgroundColor: 'rgba(255, 49, 49, 0.1)' };
+        if (text.includes('MAYBE')) return { borderColor: '#FFD700', shadowColor: '#FFD700', backgroundColor: 'rgba(255, 215, 0, 0.1)' };
+        return styles.aiContainer;
+    };
+
+    const answerStyle = getAnswerStyle();
 
     if (isSystem || isGuess) {
         return (
@@ -29,10 +44,13 @@ export const ChatBubble: React.FC<Props> = ({ message, isOwnMsg }) => {
                 styles.container,
                 isOwnMsg ? styles.ownContainer : styles.otherContainer,
                 isAI && styles.aiContainer,
+                answerStyle
             ]}
         >
-            <Text style={styles.username}>{message.username}</Text>
-            <Text style={[styles.messageText, isAI && styles.aiMessageText]}>{message.message}</Text>
+            <Text style={[styles.username, { color: userColor }]}>{message.username}</Text>
+            <Text style={[styles.messageText, isAI && styles.aiMessageText, isAI && { textShadowColor: answerStyle?.borderColor || colors.primary }]}>
+                {message.message}
+            </Text>
         </Animated.View>
     );
 };

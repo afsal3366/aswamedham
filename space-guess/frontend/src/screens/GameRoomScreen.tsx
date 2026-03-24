@@ -4,6 +4,7 @@ import { SpaceBackground } from '../components/SpaceBackground';
 import { NeonButton } from '../components/NeonButton';
 import { ChatBubble } from '../components/ChatBubble';
 import { PlayerAvatar } from '../components/PlayerAvatar';
+import { CountdownTimer } from '../components/CountdownTimer';
 import { useGameStore, ChatMessage, Player } from '../store/gameStore';
 import { apiClient, connectSSE } from '../services/api';
 import { colors, typography } from '../theme/colors';
@@ -11,6 +12,7 @@ import { colors, typography } from '../theme/colors';
 export const GameRoomScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     const {
         roomId, userId, isHost, players, messages, status, currentTurn, awaitingHost, gameMode,
+        maxQuestions, questionCount,
         setPlayers, addMessages, setStatus, setTurn, setGameOver, reset, setAwaitingHost
     } = useGameStore();
 
@@ -29,7 +31,6 @@ export const GameRoomScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
         const sse = connectSSE(roomId, (data: any) => {
             if (data.type === 'system') {
                 if (data.action === 'player_joined') {
-                    // Simplistic merge to avoid dupes purely relying on SSE if multiple players join
                     useGameStore.getState().setPlayers(
                         [...useGameStore.getState().players, data.player]
                             .filter((v, i, a) => a.findIndex(t => (t.id === v.id)) === i)
@@ -55,7 +56,29 @@ export const GameRoomScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
         return () => {
             sse.close();
         };
-    }, [roomId, navigation]); // Removed `players` dependency to avoid reconnects
+    }, [roomId, navigation]);
+
+    useEffect(() => {
+        const lastMsg = messages[messages.length - 1];
+        if (lastMsg?.type === 'system' && (lastMsg as any).action === 'player_kicked' && (lastMsg as any).user_id === userId) {
+            alert('You have been ejected from the mission!');
+            reset();
+            navigation.navigate('Lobby');
+        }
+    }, [messages]);
+
+    const handleKick = async (targetId: string) => {
+        if (!roomId || !userId) return;
+        try {
+            await apiClient.post('/room/kick', {
+                room_id: roomId,
+                host_id: userId,
+                target_user_id: targetId
+            });
+        } catch (e) {
+            console.error("Kick failed", e);
+        }
+    };
 
     const handleStartGame = async () => {
         try {
@@ -112,15 +135,32 @@ export const GameRoomScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
                         <Text style={styles.gameTitle}>SPACE GUESS</Text>
                         <Text style={styles.roomText}>ID: <Text style={styles.roomHighlight}>{roomId}</Text></Text>
                     </View>
+
+                    {status === 'playing' && <CountdownTimer />}
+
+                    {status === 'playing' && (
+                        <View style={styles.headerCenter}>
+                            <Text style={styles.statsLabel}>REMAINING</Text>
+                            <Text style={styles.statsValue}>{Math.max(0, (maxQuestions * players.length) - questionCount)}</Text>
+                        </View>
+                    )}
+
                     <View style={styles.playersContainer}>
-                        {players.map(p => (
-                            <PlayerAvatar
-                                key={p.id}
-                                username={p.username}
-                                isActive={currentTurn === p.id}
-                                isHost={p.is_host}
-                            />
-                        ))}
+                        {players.map(p => {
+                            const isGameHost = p.is_host && gameMode === 'HOST';
+                            const used = messages.filter(m => m.user_id === p.id && m.type === 'question').length;
+                            return (
+                                <PlayerAvatar
+                                    key={p.id}
+                                    username={p.username}
+                                    isActive={currentTurn === p.id}
+                                    isHost={p.is_host}
+                                    isMe={p.id === userId}
+                                    remaining={isGameHost ? undefined : Math.max(0, maxQuestions - used)}
+                                    onKick={isHost && !p.is_host ? () => handleKick(p.id) : undefined}
+                                />
+                            );
+                        })}
                     </View>
                 </View>
 
@@ -148,6 +188,10 @@ export const GameRoomScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
                             <NeonButton title="NO" onPress={() => handleHostAnswer('NO')} style={styles.choiceBtn} gradientColors={['#ff0055', '#cc0044']} />
                             <NeonButton title="MAYBE" onPress={() => handleHostAnswer('MAYBE')} style={styles.choiceBtn} />
                         </View>
+                    </View>
+                ) : isHost && gameMode === 'HOST' ? (
+                    <View style={styles.hostStatusPanel}>
+                        <Text style={styles.hostStatusText}>You are the Mission Controller. Monitor the comms and wait for the next question.</Text>
                     </View>
                 ) : (
                     <View style={[styles.inputContainer, (!myTurn || awaitingHost) && styles.disabledInput]}>
@@ -214,6 +258,27 @@ const styles = StyleSheet.create({
     },
     headerLeft: {
         justifyContent: 'center',
+        flex: 1,
+    },
+    headerCenter: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        flex: 1,
+    },
+    statsLabel: {
+        color: colors.textMuted,
+        fontSize: 8,
+        fontFamily: typography.fontFamily,
+        letterSpacing: 1,
+        marginBottom: 2,
+    },
+    statsValue: {
+        color: colors.primary,
+        fontSize: 18,
+        fontWeight: 'bold',
+        fontFamily: typography.fontFamily,
+        textShadowColor: colors.primary,
+        textShadowRadius: 5,
     },
     gameTitle: {
         color: colors.primary,
@@ -333,5 +398,21 @@ const styles = StyleSheet.create({
         marginHorizontal: 5,
         marginVertical: 0,
         paddingVertical: 10,
+    },
+    hostStatusPanel: {
+        padding: 20,
+        backgroundColor: 'rgba(0,0,0,0.4)',
+        borderTopWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+        alignItems: 'center',
+        paddingBottom: 30,
+    },
+    hostStatusText: {
+        color: colors.primary,
+        fontSize: 13,
+        fontFamily: typography.fontFamily,
+        fontStyle: 'italic',
+        textAlign: 'center',
+        opacity: 0.8,
     }
 });

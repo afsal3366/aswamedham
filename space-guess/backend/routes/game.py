@@ -2,9 +2,9 @@ import uuid
 import json
 import random
 from fastapi import APIRouter, HTTPException
-from models import GameStart, QuestionSubmit, GuessSubmit, HostAnswerSubmit
+from models import GameStart, QuestionSubmit, GuessSubmit, HostAnswerSubmit, RoomKick, SkipTurn
 from redis_client import RedisStore
-from ai_service import get_yes_no_answer, generate_random_word_via_ai
+from ai_service import get_yes_no_answer, generate_random_word_via_ai, get_random_person
 
 import httpx
 
@@ -30,10 +30,22 @@ async def start_game(req: GameStart):
         raise HTTPException(status_code=403, detail="Only host can start")
 
     if meta.get("mode", "AI") == "AI":
-        word = await fetch_random_word()
+        category = meta.get("category")
+        difficulty = meta.get("difficulty", "medium")
+        if category and category != "null":
+            word = await get_random_person(category, difficulty)
+        else:
+            word = await fetch_random_word()
         await redis.set(f"room:{req.room_id}:word", word, ex=3600)
     
     player_ids = list(players_raw.keys())
+    # If Host Mode, exclude the host from turn rotation
+    if meta.get("mode") == "HOST":
+        player_ids = [pid for pid in player_ids if not json.loads(players_raw[pid]).get("is_host")]
+        
+    if not player_ids: # Should not happen if room creation logic is sound
+         raise HTTPException(status_code=400, detail="No players besides host")
+
     first_turn = random.choice(player_ids)
     await redis.set(f"room:{req.room_id}:turn", first_turn, ex=3600)
     
@@ -112,32 +124,21 @@ async def ask_question(req: QuestionSubmit):
     
     await redis.rpush(f"room:{req.room_id}:chat", json.dumps(q_msg), json.dumps(a_msg))
     
-    # Change turn
-    player_ids = list(players_raw.keys())
-    idx = player_ids.index(req.user_id)
-    next_turn = player_ids[(idx + 1) % len(player_ids)]
-    await redis.set(f"room:{req.room_id}:turn", next_turn)
-    
     await RedisStore.publish(f"channel:{req.room_id}", {
         "type": "chat",
         "messages": [q_msg, a_msg]
     })
     
-    # End game if total chances reached
+    # Check max questions
     chances_per_player = int(meta.get("max_questions", 5))
-    num_players = len(player_ids)
-    total_allowed_questions = chances_per_player * num_players
-    
-    if q_count >= total_allowed_questions:
+    num_players = len(players_raw)
+    if q_count >= chances_per_player * num_players:
         await redis.hset(f"room:{req.room_id}:meta", "status", "finished")
         end_msg = {"type": "system", "action": "game_over", "reason": "max_questions", "word": word}
         await RedisStore.publish(f"channel:{req.room_id}", end_msg)
     else:
-        await RedisStore.publish(f"channel:{req.room_id}", {
-            "type": "system",
-            "action": "turn_change",
-            "turn": next_turn
-        })
+        # Change turn
+        await rotate_turn(req.room_id, req.user_id)
         
     return {"status": "ok", "answer": answer}
 
@@ -178,28 +179,12 @@ async def host_answer(req: HostAnswerSubmit):
     
     await redis.rpush(f"room:{req.room_id}:chat", json.dumps(a_msg))
     
-    # Turn logic
-    current_turn = await redis.get(f"room:{req.room_id}:turn")
-    player_ids = list(players_raw.keys())
-    try:
-        idx = player_ids.index(current_turn)
-    except ValueError:
-        idx = 0
-    next_turn = player_ids[(idx + 1) % len(player_ids)]
-    await redis.set(f"room:{req.room_id}:turn", next_turn)
-    
-    await RedisStore.publish(f"channel:{req.room_id}", {
-        "type": "chat",
-        "messages": [a_msg]
-    })
-    
-    await RedisStore.publish(f"channel:{req.room_id}", {
-        "type": "system",
-        "action": "host_answer_submitted"
-    })
-    
     # Check max questions
     chances_per_player = int(meta.get("max_questions", 5))
+    player_ids = list(players_raw.keys())
+    if meta.get("mode") == "HOST":
+        player_ids = [pid for pid in player_ids if not json.loads(players_raw[pid]).get("is_host")]
+        
     num_players = len(player_ids)
     if q_count >= chances_per_player * num_players:
         word = await redis.get(f"room:{req.room_id}:word")
@@ -207,11 +192,7 @@ async def host_answer(req: HostAnswerSubmit):
         end_msg = {"type": "system", "action": "game_over", "reason": "max_questions", "word": word}
         await RedisStore.publish(f"channel:{req.room_id}", end_msg)
     else:
-        await RedisStore.publish(f"channel:{req.room_id}", {
-            "type": "system",
-            "action": "turn_change",
-            "turn": next_turn
-        })
+        await rotate_turn(req.room_id, req.user_id) # current_user is host, but logic uses user_id
         
     return {"status": "ok"}
 
@@ -251,3 +232,66 @@ async def make_guess(req: GuessSubmit):
         await RedisStore.publish(f"channel:{req.room_id}", end_msg)
         
     return {"correct": correct}
+
+@router.post("/kick")
+async def kick_player(req: RoomKick):
+    redis = RedisStore.get()
+    players_raw = await redis.hgetall(f"room:{req.room_id}:players")
+    host_info = json.loads(players_raw.get(req.host_id, "{}"))
+    if not host_info.get("is_host"):
+        raise HTTPException(status_code=403, detail="Only host can kick")
+    
+    if req.target_user_id not in players_raw:
+        raise HTTPException(status_code=404, detail="Target player not found")
+        
+    await redis.hdel(f"room:{req.room_id}:players", req.target_user_id)
+    
+    # Notify everyone
+    await RedisStore.publish(f"channel:{req.room_id}", {
+        "type": "system",
+        "action": "player_kicked",
+        "user_id": req.target_user_id
+    })
+    
+    # If it was their turn, skip it
+    current_turn = await redis.get(f"room:{req.room_id}:turn")
+    if current_turn == req.target_user_id:
+        await rotate_turn(req.room_id, req.target_user_id)
+        
+    return {"status": "ok"}
+
+@router.post("/skip_turn")
+async def skip_turn_endpoint(req: SkipTurn):
+    # This can be called by frontend when timer reaches 0
+    # or by host if someone is idle
+    await rotate_turn(req.room_id, req.user_id)
+    return {"status": "ok"}
+
+async def rotate_turn(room_id: str, current_user_id: str):
+    redis = RedisStore.get()
+    players_raw = await redis.hgetall(f"room:{room_id}:players")
+    meta = await redis.hgetall(f"room:{room_id}:meta")
+    
+    player_ids = list(players_raw.keys())
+    if meta.get("mode") == "HOST":
+        player_ids = [pid for pid in player_ids if not json.loads(players_raw[pid]).get("is_host")]
+        
+    if not player_ids:
+        return
+
+    try:
+        idx = player_ids.index(current_user_id)
+        next_turn = player_ids[(idx + 1) % len(player_ids)]
+    except ValueError:
+        # User who was current turn might have been kicked/left
+        next_turn = random.choice(player_ids)
+        
+    await redis.set(f"room:{room_id}:turn", next_turn)
+    # Clear awaiting_host if we skip the host's turn (timer on host side)
+    await redis.hset(f"room:{room_id}:meta", "awaiting_host", "False")
+    
+    await RedisStore.publish(f"channel:{room_id}", {
+        "type": "system",
+        "action": "turn_change",
+        "turn": next_turn
+    })
