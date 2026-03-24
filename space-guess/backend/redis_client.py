@@ -1,0 +1,25 @@
+import redis.asyncio as redis
+import json
+from typing import Dict, Any
+
+redis_client = None
+
+class RedisStore:
+    @staticmethod
+    async def init():
+        global redis_client
+        redis_client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+
+    @staticmethod
+    async def close():
+        if redis_client:
+            await redis_client.close()
+
+    @staticmethod
+    def get() -> redis.Redis:
+        return redis_client
+
+    @staticmethod
+    async def publish(channel: str, message: dict):
+        if redis_client:
+            await redis_client.publish(channel, json.dumps(message))

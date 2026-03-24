@@ -1,0 +1,36 @@
+{
+  "name": "frontend",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web"
+  },
+  "dependencies": {
+    "@expo/metro-runtime": "~55.0.6",
+    "@react-navigation/native": "^7.2.0",
+    "@react-navigation/native-stack": "^7.14.7",
+    "axios": "^1.13.6",
+    "event-source-polyfill": "^1.0.31",
+    "expo": "~55.0.8",
+    "expo-linear-gradient": "~55.0.9",
+    "expo-status-bar": "~55.0.4",
+    "lottie-react-native": "~7.3.4",
+    "react": "19.2.0",
+    "react-dom": "^19.2.0",
+    "react-native": "0.83.2",
+    "react-native-reanimated": "^3.16.2",
+    "react-native-safe-area-context": "~5.6.2",
+    "react-native-screens": "~4.23.0",
+    "react-native-web": "^0.21.2",
+    "zustand": "^5.0.12"
+  },
+  "private": true,
+  "devDependencies": {
+    "@types/react": "^19.2.14",
+    "babel-preset-expo": "^55.0.12",
+    "typescript": "~5.9.2"
+  }
+}
