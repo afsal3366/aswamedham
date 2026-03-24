@@ -8,7 +8,10 @@ class RedisStore:
     @staticmethod
     async def init():
         global redis_client
-        redis_client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+        import os
+        host = os.getenv("REDIS_HOST", "localhost")
+        port = int(os.getenv("REDIS_PORT", "6379"))
+        redis_client = redis.Redis(host=host, port=port, db=0, decode_responses=True)
 
     @staticmethod
     async def close():
