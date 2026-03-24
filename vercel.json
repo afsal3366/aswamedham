@@ -1,0 +1,8 @@
+{
+    "rewrites": [
+        {
+            "source": "/(.*)",
+            "destination": "/space-guess/frontend/dist/index.html"
+        }
+    ]
+}
