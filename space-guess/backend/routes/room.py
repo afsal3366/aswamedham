@@ -16,7 +16,7 @@ async def create_room(req: RoomCreate):
     
     # Store all mission parameters in meta for start_game to used
     meta = {
-        "max_questions": req.max_questions,
+        "max_questions": str(req.max_questions),
         "hide_other_player_questions": str(req.hide_other_player_questions),
         "status": "lobby",
         "question_count": "0",
