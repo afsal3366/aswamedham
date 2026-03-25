@@ -243,7 +243,14 @@ async def make_guess(req: GuessSubmit):
     
     # Increment guess count if wrong
     if not correct:
-        await redis.hset(f"room:{req.room_id}:guess_counts", req.user_id, str(user_guess_count + 1))
+        new_count = user_guess_count + 1
+        await redis.hset(f"room:{req.room_id}:guess_counts", req.user_id, str(new_count))
+        
+        if new_count >= 3:
+            await redis.hset(f"room:{req.room_id}:meta", "status", "finished")
+            end_msg = {"type": "system", "action": "game_over", "reason": "max_guesses", "word": word}
+            await RedisStore.publish(f"channel:{req.room_id}", end_msg)
+            return {"correct": False, "game_over": True}
     
     g_msg = {
         "id": str(uuid.uuid4()),

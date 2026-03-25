@@ -22,7 +22,9 @@ except Exception as e:
 async def generate_random_word_via_ai() -> str:
     redis = RedisStore.get()
     salt = hex(random.getrandbits(32))[2:]
-    prompt = f"Generate a completely random, incredibly famous historical person, famous world landmark, or space object. Please ensure it is highly unique. Salt: {salt}. Reply ONLY with the exact name, and nothing else (no punctuation)."
+    prompt = f"Generate a completely random, incredibly famous historical person, famous world landmark, or space object. " \
+             f"Prioritize people or landmarks from Kerala, India or India in general (e.g., Mammootty, Taj Mahal, ISRO). " \
+             f"Please ensure it is highly unique. Salt: {salt}. Reply ONLY with the exact name, and nothing else (no punctuation)."
     # Try different models to increase reliability
     models = ["gpt-4", "gpt-3.5-turbo", "default"]
     
@@ -59,6 +61,7 @@ async def get_random_person(category: str = "actors", difficulty: str = "medium"
     
     prompt = (
         f"Generate a famous person in the category: {category}. Difficulty: {difficulty}. "
+        f"The target audience is from Kerala, India, so prioritize famous people from Kerala or highly famous Indians. "
         f"MUST NOT BE: {avoid_list}. Generate a different name every time. salt={salt}. "
         f"Reply ONLY with the exact name, and nothing else."
     )
