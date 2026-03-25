@@ -30,5 +30,5 @@ services:
     staticPublishPath: space-guess/frontend/dist
     plan: free
     envVars:
-      - key: BACKEND_URL
-        value: https://space-guess-backend.onrender.com
+      - key: EXPO_PUBLIC_BACKEND_URL
+        value: https://aswamedham-3fmh.onrender.com
