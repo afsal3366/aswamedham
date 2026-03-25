@@ -151,8 +151,11 @@ async def host_answer(req: HostAnswerSubmit):
     
     # Verify game is playing and awaiting host
     awaiting = meta.get("awaiting_host", "False")
-    if meta.get("status") != "playing" or awaiting != "True":
-        print(f"DEBUG: Host answer failed. Status: {meta.get('status')}, Awaiting: {awaiting}")
+    status = meta.get("status", "unknown")
+    print(f"DEBUG: Host Answer Request - Room: {req.room_id}, User: {req.user_id}, Status: {status}, Awaiting: {awaiting}")
+    
+    if status != "playing" or awaiting != "True":
+        print(f"DEBUG: Host answer REJECTED. Room: {req.room_id}, Status: {status}, Awaiting: {awaiting}")
         raise HTTPException(status_code=400, detail="Not awaiting host response")
         
     players_raw = await redis.hgetall(f"room:{req.room_id}:players")
@@ -278,18 +281,25 @@ async def kick_player(req: RoomKick):
     current_turn = await redis.get(f"room:{req.room_id}:turn")
     if current_turn == req.target_user_id:
         await rotate_turn(req.room_id, req.target_user_id)
-        
-    return {"status": "ok"}
 
 @router.post("/skip_turn")
 async def skip_turn_endpoint(req: SkipTurn):
-    # This can be called by frontend when timer reaches 0
-    # or by host if someone is idle
-    await rotate_turn(req.room_id, req.user_id)
+    redis = RedisStore.get()
+    # Only rotate if the current turn matches what the client observed
+    # This prevents multiple timeout triggers from skipping multiple players
+    current_turn = await redis.get(f"room:{req.room_id}:turn")
+    await rotate_turn(req.room_id, current_turn)
     return {"status": "ok"}
 
-async def rotate_turn(room_id: str, current_user_id: str):
+async def rotate_turn(room_id: str, expected_current_user_id: str):
     redis = RedisStore.get()
+    
+    # Atomic check: only rotate if the turn hasn't changed already
+    actual_current = await redis.get(f"room:{room_id}:turn")
+    if actual_current != expected_current_user_id:
+        print(f"DEBUG: Skipping rotate_turn. Expected {expected_current_user_id}, but current is {actual_current}")
+        return
+        
     players_raw = await redis.hgetall(f"room:{room_id}:players")
     meta = await redis.hgetall(f"room:{room_id}:meta")
     
@@ -301,7 +311,7 @@ async def rotate_turn(room_id: str, current_user_id: str):
         return
 
     try:
-        idx = player_ids.index(current_user_id)
+        idx = player_ids.index(expected_current_user_id)
         next_turn = player_ids[(idx + 1) % len(player_ids)]
     except ValueError:
         # User who was current turn might have been kicked/left
@@ -309,6 +319,7 @@ async def rotate_turn(room_id: str, current_user_id: str):
         
     await redis.set(f"room:{room_id}:turn", next_turn)
     # Clear awaiting_host if we skip the host's turn (timer on host side)
+    print(f"DEBUG: Rotating Turn - Room: {room_id}, New Turn: {next_turn}, Clearing awaiting_host")
     await redis.hset(f"room:{room_id}:meta", "awaiting_host", "False")
     
     await RedisStore.publish(f"channel:{room_id}", {

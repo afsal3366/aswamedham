@@ -13,12 +13,11 @@ export const GameRoomScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
     const {
         roomId, userId, isHost, players, messages, status, currentTurn, awaitingHost, gameMode,
         guessCounts, addMessages, setStatus, setTurn, setGameOver, reset, resetForNewGame,
-        triggerTimerReset
+        triggerTimerReset, setIsSubmitting, isSubmitting
     } = useGameStore();
 
     const [inputText, setInputText] = useState('');
     const [isGuessMode, setIsGuessMode] = useState(false);
-    const [isSubmitting, setIsSubmitting] = useState(false);
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
     const flatListRef = useRef<FlatList>(null);
