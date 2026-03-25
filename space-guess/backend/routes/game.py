@@ -132,9 +132,8 @@ async def ask_question(req: QuestionSubmit):
     })
     
     # Check max questions
-    chances_per_player = int(meta.get("max_questions", 5))
-    num_players = len(players_raw)
-    if q_count >= chances_per_player * num_players:
+    total_max_questions = int(meta.get("max_questions", 20))
+    if q_count >= total_max_questions:
         await redis.hset(f"room:{req.room_id}:meta", "status", "finished")
         end_msg = {"type": "system", "action": "game_over", "reason": "max_questions", "word": word}
         await RedisStore.publish(f"channel:{req.room_id}", end_msg)
@@ -191,14 +190,17 @@ async def host_answer(req: HostAnswerSubmit):
         "messages": [a_msg]
     })
     
-    # Check max questions
-    chances_per_player = int(meta.get("max_questions", 5))
-    player_ids = list(players_raw.keys())
-    if meta.get("mode") == "HOST":
-        player_ids = [pid for pid in player_ids if not json.loads(players_raw[pid]).get("is_host")]
-        
-    num_players = len(player_ids)
-    if q_count >= chances_per_player * num_players:
+    # Sync Fix: Notify all clients that the host has submitted their answer
+    await RedisStore.publish(f"channel:{req.room_id}", {
+        "type": "system",
+        "action": "host_answer_submitted",
+        "user_id": req.user_id,
+        "answer": req.answer
+    })
+    
+    # Check max questions (Global total)
+    total_max_questions = int(meta.get("max_questions", 5))
+    if q_count >= total_max_questions:
         word = await redis.get(f"room:{req.room_id}:word")
         await redis.hset(f"room:{req.room_id}:meta", "status", "finished")
         end_msg = {"type": "system", "action": "game_over", "reason": "max_questions", "word": word}
