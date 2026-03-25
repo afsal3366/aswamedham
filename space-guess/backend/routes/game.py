@@ -150,7 +150,9 @@ async def host_answer(req: HostAnswerSubmit):
     meta = await redis.hgetall(f"room:{req.room_id}:meta")
     
     # Verify game is playing and awaiting host
-    if meta.get("status") != "playing" or meta.get("awaiting_host") != "True":
+    awaiting = meta.get("awaiting_host", "False")
+    if meta.get("status") != "playing" or awaiting != "True":
+        print(f"DEBUG: Host answer failed. Status: {meta.get('status')}, Awaiting: {awaiting}")
         raise HTTPException(status_code=400, detail="Not awaiting host response")
         
     players_raw = await redis.hgetall(f"room:{req.room_id}:players")
@@ -181,6 +183,11 @@ async def host_answer(req: HostAnswerSubmit):
     
     await redis.rpush(f"room:{req.room_id}:chat", json.dumps(a_msg))
     
+    await RedisStore.publish(f"channel:{req.room_id}", {
+        "type": "chat",
+        "messages": [a_msg]
+    })
+    
     # Check max questions
     chances_per_player = int(meta.get("max_questions", 5))
     player_ids = list(players_raw.keys())
@@ -194,7 +201,8 @@ async def host_answer(req: HostAnswerSubmit):
         end_msg = {"type": "system", "action": "game_over", "reason": "max_questions", "word": word}
         await RedisStore.publish(f"channel:{req.room_id}", end_msg)
     else:
-        await rotate_turn(req.room_id, req.user_id) # current_user is host, but logic uses user_id
+        # Crucial: Advance turn based on the person who ASKED the question
+        await rotate_turn(req.room_id, pending_q["user_id"])
         
     return {"status": "ok"}
 

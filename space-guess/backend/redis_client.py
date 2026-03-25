@@ -9,16 +9,8 @@ class RedisStore:
     async def init():
         global redis_client
         import os
-        # Support both standard REDIS_URL and the new VALKEY_URL
-        redis_url = os.getenv("VALKEY_URL") or os.getenv("REDIS_URL")
-        
+        redis_url = os.getenv("REDIS_URL")
         if redis_url:
-            # Normalize valkey:// protocol to redis:// for compatibility with redis-py
-            if redis_url.startswith("valkey://"):
-                redis_url = redis_url.replace("valkey://", "redis://", 1)
-            elif redis_url.startswith("valkeys://"):
-                redis_url = redis_url.replace("valkeys://", "rediss://", 1)
-                
             redis_client = redis.from_url(redis_url, decode_responses=True)
         else:
             host = os.getenv("REDIS_HOST", "localhost")
