@@ -21,6 +21,7 @@ export const GameRoomScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
     const flatListRef = useRef<FlatList>(null);
+    const inputRef = useRef<TextInput>(null);
     const { width, height } = useWindowDimensions();
     const isDesktop = width > 1024;
     const isTablet = width > 768 && width <= 1024;
@@ -102,6 +103,7 @@ export const GameRoomScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
             setInputText(text);
         } finally {
             setIsSubmitting(false);
+            setTimeout(() => inputRef.current?.focus(), 100);
         }
     };
 
@@ -242,6 +244,7 @@ export const GameRoomScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
 
                                     <View style={styles.inputRow}>
                                         <TextInput
+                                            ref={inputRef}
                                             style={styles.terminalInput}
                                             placeholder={isGuessMode ? "Identify target..." : "Transmit question..."}
                                             placeholderTextColor="rgba(0, 245, 255, 0.3)"
