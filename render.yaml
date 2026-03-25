@@ -9,7 +9,7 @@ services:
   - type: web
     name: space-guess-backend
     env: docker
-    dockerContextDir: backend
+    dockerContextDir: space-guess/backend
     dockerfilePath: Dockerfile
     plan: free
     healthCheckPath: /health
@@ -34,7 +34,7 @@ services:
   - type: web
     name: space-guess-frontend
     env: docker
-    dockerContextDir: frontend
+    dockerContextDir: space-guess/frontend
     dockerfilePath: Dockerfile
     plan: free
     envVars:
