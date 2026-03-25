@@ -12,8 +12,8 @@ import { colors, typography } from '../theme/colors';
 export const GameRoomScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     const {
         roomId, userId, isHost, players, messages, status, currentTurn, awaitingHost, gameMode,
-        maxQuestions, questionCount,
-        setPlayers, addMessages, setStatus, setTurn, setGameOver, reset, setAwaitingHost
+        maxQuestions, questionCount, guessCounts,
+        setPlayers, addMessages, setStatus, setTurn, setGameOver, reset, resetForNewGame, setAwaitingHost
     } = useGameStore();
 
     const [inputText, setInputText] = useState('');
@@ -47,6 +47,27 @@ export const GameRoomScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
                     useGameStore.getState().setAwaitingHost(true);
                 } else if (data.action === 'host_answer_submitted') {
                     useGameStore.getState().setAwaitingHost(false);
+                } else if (data.action === 'player_left') {
+                    const currentPlayers = useGameStore.getState().players;
+                    useGameStore.getState().setPlayers(currentPlayers.filter(p => p.id !== data.user_id));
+                    if (data.is_host) {
+                        Alert.alert('Room Closed', 'The host has left the room.');
+                        reset();
+                        navigation.replace('Lobby');
+                    }
+                } else if (data.action === 'player_kicked') {
+                    if (data.user_id === userId) {
+                        Alert.alert('Kicked', 'You have been removed from the room.');
+                        reset();
+                        navigation.replace('Lobby');
+                    } else {
+                        const currentPlayers = useGameStore.getState().players;
+                        useGameStore.getState().setPlayers(currentPlayers.filter(p => p.id !== data.user_id));
+                    }
+                } else if (data.action === 'room_closed') {
+                    Alert.alert('Room Closed', 'The room has been closed.');
+                    reset();
+                    navigation.replace('Lobby');
                 }
             } else if (data.type === 'chat') {
                 addMessages(data.messages);
@@ -114,6 +135,25 @@ export const GameRoomScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
         }
     };
 
+    const handleExit = async () => {
+        try {
+            await apiClient.post('/room/leave', { room_id: roomId, user_id: userId });
+            reset();
+            navigation.replace('Lobby');
+        } catch (e: any) {
+            Alert.alert('Error', 'Failed to leave room');
+        }
+    };
+
+    const handlePlayAgain = async () => {
+        try {
+            await apiClient.post('/game/start', { room_id: roomId, user_id: userId });
+            resetForNewGame();
+        } catch (e: any) {
+            Alert.alert('Error', e.response?.data?.detail || 'Failed to restart mission');
+        }
+    };
+
     const myTurn = currentTurn === userId;
 
     return (
@@ -138,10 +178,27 @@ export const GameRoomScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
 
                     {status === 'playing' && <CountdownTimer />}
 
+                    <NeonButton
+                        title="EXIT"
+                        onPress={handleExit}
+                        style={styles.exitBtn}
+                        textStyle={{ fontSize: 10 }}
+                        gradientColors={['#ff3355', '#cc0022']}
+                    />
+
                     {status === 'playing' && (
                         <View style={styles.headerCenter}>
-                            <Text style={styles.statsLabel}>REMAINING</Text>
+                            <Text style={styles.statsLabel}>QUESTIONS</Text>
                             <Text style={styles.statsValue}>{Math.max(0, (maxQuestions * players.length) - questionCount)}</Text>
+                        </View>
+                    )}
+
+                    {status === 'playing' && (
+                        <View style={styles.headerCenter}>
+                            <Text style={styles.statsLabel}>YOUR GUESSES</Text>
+                            <Text style={[styles.statsValue, { color: '#FFCC00', textShadowColor: '#FFCC00' }]}>
+                                {3 - (guessCounts[userId || ''] || 0)}
+                            </Text>
                         </View>
                     )}
 
@@ -157,6 +214,7 @@ export const GameRoomScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
                                     isHost={p.is_host}
                                     isMe={p.id === userId}
                                     remaining={isGameHost ? undefined : Math.max(0, maxQuestions - used)}
+                                    guessCount={isGameHost ? undefined : (guessCounts[p.id] || 0)}
                                     onKick={isHost && !p.is_host ? () => handleKick(p.id) : undefined}
                                 />
                             );
@@ -179,6 +237,11 @@ export const GameRoomScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
                     <View style={styles.controlArea}>
                         <Text style={styles.waitingText}>Awaiting Mission Start...</Text>
                         {isHost && <NeonButton title="Initiate Sequence" onPress={handleStartGame} />}
+                    </View>
+                ) : status === 'finished' ? (
+                    <View style={styles.controlArea}>
+                        <Text style={styles.waitingText}>Mission Debug Finished.</Text>
+                        {isHost && <NeonButton title="Prepare New Mission" onPress={handlePlayAgain} />}
                     </View>
                 ) : awaitingHost && isHost ? (
                     <View style={styles.hostControlPanel}>
@@ -217,13 +280,21 @@ export const GameRoomScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
                             <NeonButton
                                 title={isGuessMode ? "GUESS" : "SEND"}
                                 onPress={handleSend}
-                                disabled={!myTurn || awaitingHost || !inputText.trim()}
+                                disabled={!myTurn || awaitingHost || !inputText.trim() || (isGuessMode && (guessCounts[userId || ''] || 0) >= 3)}
                                 style={styles.sendBtn}
                                 textStyle={{ fontSize: 14 }}
                             />
                         </View>
                         {!myTurn && !awaitingHost && <Text style={styles.notTurnText}>Waiting for other player's move...</Text>}
                         {awaitingHost && !isHost && <Text style={styles.notTurnText}>Waiting for host response...</Text>}
+                        {isGuessMode && (guessCounts[userId || ''] || 0) >= 3 && (
+                            <Text style={[styles.notTurnText, { color: '#FF3131' }]}>You have used all your guesses (3/3)!</Text>
+                        )}
+                        {isGuessMode && (guessCounts[userId || ''] || 0) < 3 && (
+                            <Text style={[styles.notTurnText, { color: '#FFCC00' }]}>
+                                Warning: {3 - (guessCounts[userId || ''] || 0)} guesses remaining! Use them wisely.
+                            </Text>
+                        )}
                     </View>
                 )}
             </KeyboardAvoidingView>
@@ -286,6 +357,12 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: 'bold',
         letterSpacing: 2,
+    },
+    exitBtn: {
+        width: 60,
+        height: 34,
+        marginVertical: 0,
+        marginLeft: 10,
     },
     roomText: {
         color: colors.textMuted,

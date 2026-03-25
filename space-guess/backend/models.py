@@ -15,6 +15,10 @@ class RoomJoin(BaseModel):
     room_id: str
     username: str
 
+class RoomLeave(BaseModel):
+    room_id: str
+    user_id: str
+
 class GameStart(BaseModel):
     room_id: str
     user_id: str # must be host to trigger

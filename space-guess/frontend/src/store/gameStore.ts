@@ -32,6 +32,7 @@ export interface GameState {
     awaitingHost: boolean;
     timerValue: number;
     userColors: Record<string, string>;
+    guessCounts: Record<string, number>;
 
     setRoomInfo: (roomId: string, userId: string, username: string, isHost: boolean, maxQ: number, mode?: 'AI' | 'HOST') => void;
     setAwaitingHost: (awaiting: boolean) => void;
@@ -43,6 +44,7 @@ export interface GameState {
     setStatus: (status: 'lobby' | 'playing' | 'finished') => void;
     setTurn: (turn: string) => void;
     reset: () => void;
+    resetForNewGame: () => void;
     setGameOver: (reason: string, word: string, winner?: string) => void;
 }
 
@@ -66,6 +68,7 @@ export const useGameStore = create<GameState>((set) => ({
         'AI': '#00FF9F',
         'HOST': '#FF00A0'
     },
+    guessCounts: {},
 
     setRoomInfo: (roomId, userId, username, isHost, maxQ, mode) => set({ roomId, userId, username, isHost, maxQuestions: maxQ, gameMode: mode || 'AI' }),
     setAwaitingHost: (awaiting) => set({ awaitingHost: awaiting }),
@@ -88,13 +91,23 @@ export const useGameStore = create<GameState>((set) => ({
         if (state.messages.find(m => m.id === msg.id)) return state;
         const newMessages = [...state.messages, msg];
         const newCount = newMessages.filter(m => m.type === 'question').length;
-        return { messages: newMessages, questionCount: newCount };
+        const newGuessCounts = { ...state.guessCounts };
+        if (msg.type === 'guess') {
+            newGuessCounts[msg.user_id] = (newGuessCounts[msg.user_id] || 0) + 1;
+        }
+        return { messages: newMessages, questionCount: newCount, guessCounts: newGuessCounts };
     }),
     addMessages: (msgs) => set((state) => {
         const newMsgs = msgs.filter(m => !state.messages.find(existing => existing.id === m.id));
         const newMessages = [...state.messages, ...newMsgs];
         const newCount = newMessages.filter(m => m.type === 'question').length;
-        return { messages: newMessages, questionCount: newCount };
+        const newGuessCounts = { ...state.guessCounts };
+        newMsgs.forEach(m => {
+            if (m.type === 'guess') {
+                newGuessCounts[m.user_id] = (newGuessCounts[m.user_id] || 0) + 1;
+            }
+        });
+        return { messages: newMessages, questionCount: newCount, guessCounts: newGuessCounts };
     }),
     setStatus: (status) => set({ status }),
     setTurn: (turn) => set({ currentTurn: turn }),
@@ -102,6 +115,10 @@ export const useGameStore = create<GameState>((set) => ({
     reset: () => set({
         roomId: null, userId: null, username: '', isHost: false, players: [],
         messages: [], status: 'lobby', currentTurn: null, word: null, winner: null, gameMode: 'AI', awaitingHost: false, questionCount: 0,
-        timerValue: 60, userColors: { 'AI': '#00FF9F', 'HOST': '#FF00A0' }
+        timerValue: 60, userColors: { 'AI': '#00FF9F', 'HOST': '#FF00A0' }, guessCounts: {}
+    }),
+    resetForNewGame: () => set({
+        messages: [], status: 'playing', currentTurn: null, word: null, winner: null, questionCount: 0,
+        awaitingHost: false, timerValue: 60, guessCounts: {}
     }),
 }));

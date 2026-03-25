@@ -1,7 +1,7 @@
 import uuid
 import json
 from fastapi import APIRouter, HTTPException
-from models import RoomCreate, RoomJoin, Player
+from models import RoomCreate, RoomJoin, RoomLeave, Player
 from redis_client import RedisStore
 from ai_service import get_random_person, generate_random_word_via_ai
 
@@ -69,3 +69,34 @@ async def join_room(req: RoomJoin):
     messages = [json.loads(m) for m in chat_raw]
     
     return {"room_id": req.room_id, "user_id": user_id, "player": player, "meta": meta, "players": players, "messages": messages}
+
+@router.post("/leave")
+async def leave_room(req: RoomLeave):
+    redis = RedisStore.get()
+    
+    players_raw = await redis.hgetall(f"room:{req.room_id}:players")
+    if req.user_id not in players_raw:
+        return {"status": "already_left"}
+        
+    player_info = json.loads(players_raw[req.user_id])
+    is_host = player_info.get("is_host", False)
+    
+    await redis.hdel(f"room:{req.room_id}:players", req.user_id)
+    
+    await RedisStore.publish(f"channel:{req.room_id}", {
+        "type": "system",
+        "action": "player_left",
+        "user_id": req.user_id,
+        "is_host": is_host
+    })
+    
+    # If host leaves, the game is over/room is closed
+    if is_host:
+        await redis.hset(f"room:{req.room_id}:meta", "status", "finished")
+        await RedisStore.publish(f"channel:{req.room_id}", {
+            "type": "system",
+            "action": "room_closed",
+            "reason": "host_left"
+        })
+        
+    return {"status": "ok"}

@@ -8,10 +8,11 @@ interface Props {
     isHost: boolean;
     isMe?: boolean;
     remaining?: number;
+    guessCount?: number;
     onKick?: () => void;
 }
 
-export const PlayerAvatar: React.FC<Props> = ({ username, isActive, isHost, isMe, remaining, onKick }) => {
+export const PlayerAvatar: React.FC<Props> = ({ username, isActive, isHost, isMe, remaining, guessCount, onKick }) => {
     const animatedGlow = useAnimatedStyle(() => {
         if (!isActive) return { shadowOpacity: 0, transform: [{ scale: 1 }] };
         return {
@@ -32,6 +33,11 @@ export const PlayerAvatar: React.FC<Props> = ({ username, isActive, isHost, isMe
                 {remaining !== undefined && (
                     <View style={styles.badge}>
                         <Text style={styles.badgeText}>{remaining}</Text>
+                    </View>
+                )}
+                {guessCount !== undefined && (
+                    <View style={[styles.badge, styles.guessBadge]}>
+                        <Text style={styles.badgeText}>{3 - guessCount}</Text>
                     </View>
                 )}
             </Animated.View>
@@ -110,6 +116,13 @@ const styles = StyleSheet.create({
         shadowColor: colors.accent,
         shadowRadius: 5,
         shadowOpacity: 0.8,
+    },
+    guessBadge: {
+        bottom: -5,
+        right: -5,
+        top: undefined,
+        backgroundColor: '#FFCC00',
+        shadowColor: '#FFCC00',
     },
     badgeText: {
         color: colors.text,

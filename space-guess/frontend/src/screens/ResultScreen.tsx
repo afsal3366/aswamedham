@@ -17,6 +17,10 @@ export const ResultScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         navigation.replace('Lobby');
     };
 
+    const handleStay = () => {
+        navigation.goBack();
+    };
+
     return (
         <SpaceBackground>
             <View style={styles.container}>
@@ -42,7 +46,15 @@ export const ResultScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                         <Text style={styles.wordText}>{word}</Text>
                     </Animated.View>
 
-                    <NeonButton title="Return to Base" onPress={handleReturn} style={{ marginTop: 40 }} />
+                    <View style={styles.buttonRow}>
+                        <NeonButton title="Return to Room" onPress={handleStay} style={{ flex: 1, marginRight: 10 }} />
+                        <NeonButton
+                            title="Exit to Lobby"
+                            onPress={handleReturn}
+                            style={{ flex: 1 }}
+                            gradientColors={['#333', '#111']}
+                        />
+                    </View>
                 </Animated.View>
             </View>
         </SpaceBackground>
@@ -58,6 +70,12 @@ const styles = StyleSheet.create({
     },
     content: {
         alignItems: 'center',
+        width: '100%',
+        maxWidth: 500,
+    },
+    buttonRow: {
+        flexDirection: 'row',
+        marginTop: 40,
         width: '100%',
     },
     title: {

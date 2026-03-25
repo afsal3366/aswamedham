@@ -51,6 +51,8 @@ async def start_game(req: GameStart):
     
     await redis.hset(f"room:{req.room_id}:meta", "status", "playing")
     await redis.hset(f"room:{req.room_id}:meta", "question_count", "0")
+    await redis.delete(f"room:{req.room_id}:guess_counts")
+    await redis.delete(f"room:{req.room_id}:chat")
     
     await RedisStore.publish(f"channel:{req.room_id}", {
         "type": "system",
@@ -205,11 +207,22 @@ async def make_guess(req: GuessSubmit):
         
     word = await redis.get(f"room:{req.room_id}:word")
     
+    # Track and enforce guess count
+    guess_counts = await redis.hgetall(f"room:{req.room_id}:guess_counts")
+    user_guess_count = int(guess_counts.get(req.user_id, 0))
+    
+    if user_guess_count >= 3:
+        raise HTTPException(status_code=403, detail="You have reached the maximum number of guesses (3).")
+
     players_raw = await redis.hgetall(f"room:{req.room_id}:players")
     player_info = json.loads(players_raw.get(req.user_id, "{}"))
     username = player_info.get("username", "Unknown")
-    
+
     correct = (req.guess.strip().upper() == word.upper())
+    
+    # Increment guess count if wrong
+    if not correct:
+        await redis.hset(f"room:{req.room_id}:guess_counts", req.user_id, str(user_guess_count + 1))
     
     g_msg = {
         "id": str(uuid.uuid4()),
