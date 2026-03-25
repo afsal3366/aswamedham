@@ -20,7 +20,7 @@ export const MissionHeader: React.FC = () => {
         );
     }
 
-    const remainingQuestions = Math.max(0, (maxQuestions * players.length) - questionCount);
+    const remainingQuestions = Math.max(0, maxQuestions - questionCount);
     const userGuesses = 3 - (guessCounts[userId || ''] || 0);
 
     return (
