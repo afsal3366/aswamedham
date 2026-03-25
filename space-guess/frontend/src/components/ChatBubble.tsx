@@ -11,20 +11,20 @@ interface Props {
 
 export const ChatBubble: React.FC<Props> = ({ message, isOwnMsg }) => {
     const { userColors } = useGameStore();
-    const isAI = message.type === 'answer';
+    const isAI = message.username === 'AI' || message.username === 'HOST';
     const isSystem = message.type === 'system';
     const isGuess = message.type === 'guess';
 
-    const userColor = userColors[message.user_id] || colors.textMuted;
+    const userColor = isAI ? colors.primary : (userColors[message.user_id] || colors.textMuted);
 
     // Semantic colors for answers
     const getAnswerStyle = () => {
-        if (!isAI) return null;
+        if (message.type !== 'answer') return null;
         const text = message.message.toUpperCase();
-        if (text.includes('YES')) return { borderColor: '#39FF14', shadowColor: '#39FF14', backgroundColor: 'rgba(57, 255, 20, 0.1)' };
-        if (text.includes('NO')) return { borderColor: '#FF3131', shadowColor: '#FF3131', backgroundColor: 'rgba(255, 49, 49, 0.1)' };
-        if (text.includes('MAYBE')) return { borderColor: '#FFD700', shadowColor: '#FFD700', backgroundColor: 'rgba(255, 215, 0, 0.1)' };
-        return styles.aiContainer;
+        if (text.includes('YES')) return { borderColor: '#39FF14', shadowColor: '#39FF14' };
+        if (text.includes('NO')) return { borderColor: '#FF3131', shadowColor: '#FF3131' };
+        if (text.includes('MAYBE')) return { borderColor: '#FFD700', shadowColor: '#FFD700' };
+        return { borderColor: colors.primary, shadowColor: colors.primary };
     };
 
     const answerStyle = getAnswerStyle();
@@ -32,7 +32,11 @@ export const ChatBubble: React.FC<Props> = ({ message, isOwnMsg }) => {
     if (isSystem || isGuess) {
         return (
             <Animated.View entering={FadeIn.duration(400)} style={styles.systemContainer}>
-                <Text style={[styles.systemText, isGuess && styles.guessText]}>{message.message}</Text>
+                <View style={[styles.systemLine, { backgroundColor: isGuess ? colors.accent : colors.border }]} />
+                <Text style={[styles.systemText, isGuess && styles.guessText]}>
+                    {isGuess ? '🚀 ' : ''}{message.message}
+                </Text>
+                <View style={[styles.systemLine, { backgroundColor: isGuess ? colors.accent : colors.border }]} />
             </Animated.View>
         );
     }
@@ -44,79 +48,122 @@ export const ChatBubble: React.FC<Props> = ({ message, isOwnMsg }) => {
                 styles.container,
                 isOwnMsg ? styles.ownContainer : styles.otherContainer,
                 isAI && styles.aiContainer,
-                answerStyle
+                answerStyle && { borderColor: answerStyle.borderColor, shadowColor: answerStyle.shadowColor }
             ]}
         >
-            <Text style={[styles.username, { color: userColor }]}>{message.username}</Text>
-            <Text style={[styles.messageText, isAI && styles.aiMessageText, isAI && { textShadowColor: answerStyle?.borderColor || colors.primary }]}>
+            <View style={styles.header}>
+                <Text style={[styles.username, { color: userColor }]}>
+                    {isAI ? '⦿ ' : ''}{message.username}
+                </Text>
+                {isAI && <View style={[styles.pulse, { backgroundColor: answerStyle?.borderColor || colors.primary }]} />}
+            </View>
+            <Text style={[
+                styles.messageText,
+                isAI && styles.aiMessageText,
+                isAI && { textShadowColor: answerStyle?.borderColor || colors.primary }
+            ]}>
                 {message.message}
             </Text>
+
+            {/* Holographic detail line */}
+            <View style={[styles.detailLine, { backgroundColor: userColor, opacity: 0.3 }]} />
         </Animated.View>
     );
 };
 
 const styles = StyleSheet.create({
     systemContainer: {
+        flexDirection: 'row',
         alignItems: 'center',
-        marginVertical: 10,
+        justifyContent: 'center',
+        marginVertical: 12,
+        paddingHorizontal: 20,
+    },
+    systemLine: {
+        height: 1,
+        flex: 1,
+        opacity: 0.2,
     },
     systemText: {
         color: colors.textMuted,
-        fontSize: 12,
-        fontFamily: typography.fontFamily,
-        fontStyle: 'italic',
+        fontSize: 10,
+        fontFamily: typography.monoFont,
+        marginHorizontal: 15,
+        textTransform: 'uppercase',
+        letterSpacing: 1,
     },
     guessText: {
         color: colors.accent,
         fontWeight: 'bold',
-        fontSize: 14,
+        fontSize: 11,
     },
     container: {
-        maxWidth: '60%',
-        padding: 15,
-        borderRadius: 16,
-        marginVertical: 8,
+        maxWidth: '85%',
+        padding: 12,
+        borderRadius: 4,
+        marginVertical: 6,
+        backgroundColor: 'rgba(20, 20, 40, 0.6)',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.4,
+        shadowRadius: 5,
     },
     ownContainer: {
         alignSelf: 'flex-end',
-        backgroundColor: colors.surface,
-        borderWidth: 1,
-        borderColor: colors.border,
-        borderBottomRightRadius: 4,
+        borderRightWidth: 3,
+        borderRightColor: colors.secondary,
     },
     otherContainer: {
         alignSelf: 'flex-start',
-        backgroundColor: 'rgba(255,255,255,0.05)',
-        borderBottomLeftRadius: 4,
+        borderLeftWidth: 3,
+        borderLeftColor: colors.primary,
     },
     aiContainer: {
-        alignSelf: 'flex-start',
-        backgroundColor: 'rgba(0, 255, 255, 0.1)',
+        alignSelf: 'center',
+        width: '90%',
+        backgroundColor: 'rgba(0, 245, 255, 0.05)',
         borderColor: colors.primary,
-        borderWidth: 1.5,
-        borderBottomLeftRadius: 4,
-        shadowColor: colors.primary,
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.8,
+        borderWidth: 1,
+        borderTopWidth: 2,
         shadowRadius: 10,
     },
+    header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 6,
+    },
     username: {
-        color: colors.textMuted,
         fontSize: 10,
-        marginBottom: 4,
-        fontFamily: typography.fontFamily,
+        fontWeight: 'bold',
+        fontFamily: typography.titleFont,
+        letterSpacing: 1,
+    },
+    pulse: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        opacity: 0.8,
     },
     messageText: {
         color: colors.text,
         fontSize: 14,
-        fontFamily: typography.fontFamily,
+        fontFamily: typography.bodyFont,
+        lineHeight: 20,
     },
     aiMessageText: {
         color: '#fff',
         fontWeight: 'bold',
-        letterSpacing: 1,
-        textShadowColor: colors.primary,
-        textShadowOffset: { width: 0, height: 0 },
+        fontSize: 16,
+        textAlign: 'center',
+        fontFamily: typography.titleFont,
         textShadowRadius: 8,
     },
+    detailLine: {
+        height: 1,
+        width: '30%',
+        marginTop: 8,
+        alignSelf: 'flex-start',
+    }
 });

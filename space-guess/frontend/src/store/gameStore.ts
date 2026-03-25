@@ -31,6 +31,7 @@ export interface GameState {
     gameMode: 'AI' | 'HOST';
     awaitingHost: boolean;
     timerValue: number;
+    timerResetKey: number;
     userColors: Record<string, string>;
     guessCounts: Record<string, number>;
 
@@ -39,6 +40,7 @@ export interface GameState {
     setPlayers: (players: Player[]) => void;
     setQuestionCount: (count: number) => void;
     setTimerValue: (val: number) => void;
+    triggerTimerReset: () => void;
     addMessage: (msg: ChatMessage) => void;
     addMessages: (msgs: ChatMessage[]) => void;
     setStatus: (status: 'lobby' | 'playing' | 'finished') => void;
@@ -69,6 +71,7 @@ export const useGameStore = create<GameState>((set) => ({
         'HOST': '#FF00A0'
     },
     guessCounts: {},
+    timerResetKey: 0,
 
     setRoomInfo: (roomId, userId, username, isHost, maxQ, mode) => set({ roomId, userId, username, isHost, maxQuestions: maxQ, gameMode: mode || 'AI' }),
     setAwaitingHost: (awaiting) => set({ awaitingHost: awaiting }),
@@ -87,6 +90,10 @@ export const useGameStore = create<GameState>((set) => ({
     }),
     setQuestionCount: (count) => set({ questionCount: count }),
     setTimerValue: (val) => set({ timerValue: val }),
+    triggerTimerReset: () => set((state) => ({
+        timerValue: 60,
+        timerResetKey: state.timerResetKey + 1
+    })),
     addMessage: (msg) => set((state) => {
         if (state.messages.find(m => m.id === msg.id)) return state;
         const newMessages = [...state.messages, msg];
@@ -115,10 +122,10 @@ export const useGameStore = create<GameState>((set) => ({
     reset: () => set({
         roomId: null, userId: null, username: '', isHost: false, players: [],
         messages: [], status: 'lobby', currentTurn: null, word: null, winner: null, gameMode: 'AI', awaitingHost: false, questionCount: 0,
-        timerValue: 60, userColors: { 'AI': '#00FF9F', 'HOST': '#FF00A0' }, guessCounts: {}
+        timerValue: 60, timerResetKey: 0, userColors: { 'AI': '#00FF9F', 'HOST': '#FF00A0' }, guessCounts: {}
     }),
     resetForNewGame: () => set({
         messages: [], status: 'playing', currentTurn: null, word: null, winner: null, questionCount: 0,
-        awaitingHost: false, timerValue: 60, guessCounts: {}
+        awaitingHost: false, timerValue: 60, timerResetKey: 0, guessCounts: {}
     }),
 }));

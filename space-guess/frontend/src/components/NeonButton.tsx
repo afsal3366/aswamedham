@@ -20,10 +20,10 @@ export const NeonButton: React.FC<Props> = ({ title, onPress, style, textStyle, 
 
     const animatedStyle = useAnimatedStyle(() => ({
         transform: [{ scale: scale.value }],
-        opacity: disabled ? 0.5 : 1,
+        opacity: disabled ? 0.4 : 1,
     }));
 
-    const onPressIn = () => { scale.value = withSpring(0.95); };
+    const onPressIn = () => { scale.value = withSpring(0.96); };
     const onPressOut = () => { scale.value = withSpring(1); };
 
     return (
@@ -35,9 +35,9 @@ export const NeonButton: React.FC<Props> = ({ title, onPress, style, textStyle, 
             style={[styles.container, animatedStyle, style]}
         >
             <LinearGradient
-                colors={gradientColors || [colors.primary, colors.secondary]}
-                start={[0, 0]}
-                end={[1, 1]}
+                colors={(gradientColors || [colors.primary, colors.accent]) as any}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
                 style={styles.gradient}
             >
                 <Text style={[styles.text, textStyle]}>{title}</Text>
@@ -48,27 +48,27 @@ export const NeonButton: React.FC<Props> = ({ title, onPress, style, textStyle, 
 
 const styles = StyleSheet.create({
     container: {
-        borderRadius: 8,
+        borderRadius: 100, // Fully rounded
         shadowColor: colors.primary,
         shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.8,
-        shadowRadius: 10,
-        elevation: 8,
-        marginVertical: 10,
+        shadowOpacity: 0.6,
+        shadowRadius: 8,
+        elevation: 10,
+        marginVertical: 8,
     },
     gradient: {
-        paddingVertical: 14,
-        paddingHorizontal: 32,
-        borderRadius: 8,
+        paddingVertical: 10,
+        paddingHorizontal: 24,
+        borderRadius: 100,
         alignItems: 'center',
         justifyContent: 'center',
     },
     text: {
         color: colors.text,
-        fontSize: 16,
+        fontSize: 14,
         fontWeight: 'bold',
-        fontFamily: typography.fontFamily,
+        fontFamily: typography.titleFont,
         textTransform: 'uppercase',
-        letterSpacing: 2,
+        letterSpacing: 1.5,
     },
 });

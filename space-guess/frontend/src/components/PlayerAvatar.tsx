@@ -4,48 +4,58 @@ import { colors, typography } from '../theme/colors';
 
 interface Props {
     username: string;
-    isActive: boolean;
+    isActive?: boolean;
     isHost: boolean;
     isMe?: boolean;
     remaining?: number;
     guessCount?: number;
     onKick?: () => void;
+    size?: number;
 }
 
-export const PlayerAvatar: React.FC<Props> = ({ username, isActive, isHost, isMe, remaining, guessCount, onKick }) => {
+export const PlayerAvatar: React.FC<Props> = ({
+    username, isActive, isHost, isMe, remaining, guessCount, onKick, size = 50
+}) => {
     const animatedGlow = useAnimatedStyle(() => {
         if (!isActive) return { shadowOpacity: 0, transform: [{ scale: 1 }] };
         return {
-            shadowOpacity: withRepeat(withSequence(withTiming(0.4, { duration: 1000 }), withTiming(0.8, { duration: 1000 })), -1, true),
-            transform: [{ scale: withRepeat(withSequence(withTiming(1, { duration: 1000 }), withTiming(1.05, { duration: 1000 })), -1, true) }]
+            shadowOpacity: withRepeat(withSequence(withTiming(0.3, { duration: 1500 }), withTiming(0.6, { duration: 1500 })), -1, true),
+            transform: [{ scale: withRepeat(withSequence(withTiming(1, { duration: 1500 }), withTiming(1.03, { duration: 1500 })), -1, true) }]
         };
     });
 
+    const initials = username?.substring(0, 2).toUpperCase() || '??';
+
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { width: size + 10 }]}>
             <Animated.View style={[
                 styles.avatarCircle,
+                { width: size, height: size, borderRadius: size / 2 },
                 isActive && styles.activeCircle,
                 isMe && styles.meCircle,
                 animatedGlow
             ]}>
-                <Text style={styles.initials}>{username.substring(0, 2).toUpperCase()}</Text>
+                <Text style={[styles.initials, { fontSize: size * 0.35 }]}>{initials}</Text>
+
                 {remaining !== undefined && (
-                    <View style={styles.badge}>
+                    <View style={[styles.badge, { top: -size * 0.1, right: -size * 0.1 }]}>
                         <Text style={styles.badgeText}>{remaining}</Text>
                     </View>
                 )}
+
                 {guessCount !== undefined && (
-                    <View style={[styles.badge, styles.guessBadge]}>
+                    <View style={[styles.badge, styles.guessBadge, { bottom: -size * 0.1, right: -size * 0.1 }]}>
                         <Text style={styles.badgeText}>{3 - guessCount}</Text>
                     </View>
                 )}
             </Animated.View>
+
             <Text style={[styles.username, isActive && styles.activeUsername, isMe && styles.meUsername]} numberOfLines={1}>
-                {username} {isHost ? '(Host)' : ''}
+                {username} {isHost ? '★' : ''}
             </Text>
+
             {onKick && (
-                <TouchableOpacity onPress={onKick} style={styles.kickButton}>
+                <TouchableOpacity onPress={onKick} style={[styles.kickButton, { bottom: size * 0.4 }]}>
                     <Text style={styles.kickText}>×</Text>
                 </TouchableOpacity>
             )}
@@ -56,26 +66,22 @@ export const PlayerAvatar: React.FC<Props> = ({ username, isActive, isHost, isMe
 const styles = StyleSheet.create({
     container: {
         alignItems: 'center',
-        marginHorizontal: 10,
-        width: 60,
+        marginHorizontal: 8,
     },
     avatarCircle: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
-        backgroundColor: colors.surface,
-        borderWidth: 1,
-        borderColor: colors.border,
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        borderWidth: 1.5,
+        borderColor: 'rgba(255,255,255,0.2)',
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 5,
+        marginBottom: 6,
     },
     activeCircle: {
         borderColor: colors.primary,
-        backgroundColor: colors.surfaceGlow,
+        backgroundColor: 'rgba(0, 245, 255, 0.1)',
         shadowColor: colors.primary,
         shadowOffset: { width: 0, height: 0 },
-        shadowRadius: 10,
+        shadowRadius: 12,
     },
     meCircle: {
         borderColor: colors.accent,
@@ -83,14 +89,13 @@ const styles = StyleSheet.create({
     },
     initials: {
         color: colors.text,
-        fontFamily: typography.fontFamily,
+        fontFamily: typography.monoFont,
         fontWeight: 'bold',
-        fontSize: 16,
     },
     username: {
         color: colors.textMuted,
         fontSize: 10,
-        fontFamily: typography.fontFamily,
+        fontFamily: typography.bodyFont,
         textAlign: 'center',
     },
     activeUsername: {
@@ -103,8 +108,6 @@ const styles = StyleSheet.create({
     },
     badge: {
         position: 'absolute',
-        top: -5,
-        right: -5,
         backgroundColor: colors.accent,
         borderRadius: 10,
         width: 18,
@@ -118,28 +121,25 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.8,
     },
     guessBadge: {
-        bottom: -5,
-        right: -5,
-        top: undefined,
         backgroundColor: '#FFCC00',
         shadowColor: '#FFCC00',
     },
     badgeText: {
         color: colors.text,
-        fontSize: 10,
+        fontSize: 9,
         fontWeight: 'bold',
-        fontFamily: typography.fontFamily,
+        fontFamily: typography.monoFont,
     },
     kickButton: {
         position: 'absolute',
-        bottom: 20,
         right: 0,
-        backgroundColor: '#FF3131',
+        backgroundColor: colors.danger,
         width: 16,
         height: 16,
         borderRadius: 8,
         justifyContent: 'center',
         alignItems: 'center',
+        zIndex: 10,
     },
     kickText: {
         color: '#fff',

@@ -1,26 +1,30 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { StyleSheet, View, Text, FlatList, TextInput, KeyboardAvoidingView, Platform, Alert, useWindowDimensions } from 'react-native';
+import { StyleSheet, View, Text, FlatList, TextInput, KeyboardAvoidingView, Platform, Alert, useWindowDimensions, Pressable } from 'react-native';
 import { SpaceBackground } from '../components/SpaceBackground';
 import { NeonButton } from '../components/NeonButton';
 import { ChatBubble } from '../components/ChatBubble';
-import { PlayerAvatar } from '../components/PlayerAvatar';
-import { CountdownTimer } from '../components/CountdownTimer';
-import { useGameStore, ChatMessage, Player } from '../store/gameStore';
+import { AstronautSidebar } from '../components/AstronautSidebar';
+import { MissionHeader } from '../components/MissionHeader';
+import { useGameStore } from '../store/gameStore';
 import { apiClient, connectSSE } from '../services/api';
 import { colors, typography } from '../theme/colors';
 
 export const GameRoomScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     const {
         roomId, userId, isHost, players, messages, status, currentTurn, awaitingHost, gameMode,
-        maxQuestions, questionCount, guessCounts,
-        setPlayers, addMessages, setStatus, setTurn, setGameOver, reset, resetForNewGame, setAwaitingHost
+        guessCounts, addMessages, setStatus, setTurn, setGameOver, reset, resetForNewGame,
+        triggerTimerReset
     } = useGameStore();
 
     const [inputText, setInputText] = useState('');
     const [isGuessMode, setIsGuessMode] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
     const flatListRef = useRef<FlatList>(null);
     const { width, height } = useWindowDimensions();
-    const isDesktop = width > 768;
+    const isDesktop = width > 1024;
+    const isTablet = width > 768 && width <= 1024;
 
     useEffect(() => {
         if (!roomId) {
@@ -40,13 +44,16 @@ export const GameRoomScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
                     setTurn(data.turn);
                 } else if (data.action === 'turn_change') {
                     setTurn(data.turn);
+                    triggerTimerReset();
                 } else if (data.action === 'game_over') {
                     setGameOver(data.reason, data.word, data.winner);
                     navigation.navigate('Result');
                 } else if (data.action === 'awaiting_host_response') {
                     useGameStore.getState().setAwaitingHost(true);
+                    triggerTimerReset();
                 } else if (data.action === 'host_answer_submitted') {
                     useGameStore.getState().setAwaitingHost(false);
+                    triggerTimerReset();
                 } else if (data.action === 'player_left') {
                     const currentPlayers = useGameStore.getState().players;
                     useGameStore.getState().setPlayers(currentPlayers.filter(p => p.id !== data.user_id));
@@ -57,7 +64,7 @@ export const GameRoomScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
                     }
                 } else if (data.action === 'player_kicked') {
                     if (data.user_id === userId) {
-                        Alert.alert('Kicked', 'You have been removed from the room.');
+                        Alert.alert('Ejected', 'You have been ejected from the mission.');
                         reset();
                         navigation.replace('Lobby');
                     } else {
@@ -65,7 +72,7 @@ export const GameRoomScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
                         useGameStore.getState().setPlayers(currentPlayers.filter(p => p.id !== data.user_id));
                     }
                 } else if (data.action === 'room_closed') {
-                    Alert.alert('Room Closed', 'The room has been closed.');
+                    Alert.alert('Mission Aborted', 'The mission control has closed the session.');
                     reset();
                     navigation.replace('Lobby');
                 }
@@ -74,43 +81,12 @@ export const GameRoomScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
             }
         });
 
-        return () => {
-            sse.close();
-        };
+        return () => sse.close();
     }, [roomId, navigation]);
 
-    useEffect(() => {
-        const lastMsg = messages[messages.length - 1];
-        if (lastMsg?.type === 'system' && (lastMsg as any).action === 'player_kicked' && (lastMsg as any).user_id === userId) {
-            alert('You have been ejected from the mission!');
-            reset();
-            navigation.navigate('Lobby');
-        }
-    }, [messages]);
-
-    const handleKick = async (targetId: string) => {
-        if (!roomId || !userId) return;
-        try {
-            await apiClient.post('/room/kick', {
-                room_id: roomId,
-                host_id: userId,
-                target_user_id: targetId
-            });
-        } catch (e) {
-            console.error("Kick failed", e);
-        }
-    };
-
-    const handleStartGame = async () => {
-        try {
-            await apiClient.post('/game/start', { room_id: roomId, user_id: userId });
-        } catch (e) {
-            Alert.alert('Error', 'Failed to start game');
-        }
-    };
-
     const handleSend = async () => {
-        if (!inputText.trim()) return;
+        if (!inputText.trim() || isSubmitting) return;
+        setIsSubmitting(true);
         const path = isGuessMode ? '/game/guess' : '/game/question';
         const body = isGuessMode
             ? { room_id: roomId, user_id: userId, guess: inputText }
@@ -121,17 +97,49 @@ export const GameRoomScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
 
         try {
             await apiClient.post(path, body);
+            triggerTimerReset();
         } catch (e: any) {
-            Alert.alert('Error', e.response?.data?.detail || 'Failed to send');
-            setInputText(text); // restore
+            Alert.alert('Error', e.response?.data?.detail || 'Transmission failed');
+            setInputText(text);
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
     const handleHostAnswer = async (ans: 'YES' | 'NO' | 'MAYBE') => {
+        if (isSubmitting) return;
+        setIsSubmitting(true);
         try {
             await apiClient.post('/game/host_answer', { room_id: roomId, user_id: userId, answer: ans });
         } catch (e: any) {
-            Alert.alert('Error', e.response?.data?.detail || 'Failed to submit answer');
+            Alert.alert('Error', e.response?.data?.detail || 'Failed to submit response');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleStartGame = async () => {
+        if (isSubmitting) return;
+        setIsSubmitting(true);
+        try {
+            await apiClient.post('/game/start', { room_id: roomId, user_id: userId });
+        } catch (e) {
+            Alert.alert('Error', 'Initialization failed');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handlePlayAgain = async () => {
+        if (isSubmitting) return;
+        setIsSubmitting(true);
+        try {
+            await apiClient.post('/game/start', { room_id: roomId, user_id: userId });
+            resetForNewGame();
+        } catch (e: any) {
+            Alert.alert('Error', 'New mission initialization failed');
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -140,356 +148,264 @@ export const GameRoomScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
             await apiClient.post('/room/leave', { room_id: roomId, user_id: userId });
             reset();
             navigation.replace('Lobby');
-        } catch (e: any) {
-            Alert.alert('Error', 'Failed to leave room');
-        }
-    };
-
-    const handlePlayAgain = async () => {
-        try {
-            await apiClient.post('/game/start', { room_id: roomId, user_id: userId });
-            resetForNewGame();
-        } catch (e: any) {
-            Alert.alert('Error', e.response?.data?.detail || 'Failed to restart mission');
+        } catch (e) {
+            reset();
+            navigation.replace('Lobby');
         }
     };
 
     const myTurn = currentTurn === userId;
+    const currentUser = players.find(p => p.id === userId);
 
     return (
         <SpaceBackground>
-            <KeyboardAvoidingView
-                style={[
-                    styles.container,
-                    {
-                        width: isDesktop ? '70%' : '95%',
-                        height: isDesktop ? height * 0.9 : '100%',
-                        marginTop: isDesktop ? height * 0.05 : Platform.OS === 'ios' ? 40 : 0,
-                    }
-                ]}
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            >
-                {/* Header */}
-                <View style={styles.header}>
-                    <View style={styles.headerLeft}>
-                        <Text style={styles.gameTitle}>SPACE GUESS</Text>
-                        <Text style={styles.roomText}>ID: <Text style={styles.roomHighlight}>{roomId}</Text></Text>
-                    </View>
-
-                    {status === 'playing' && <CountdownTimer />}
-
-                    <NeonButton
-                        title="EXIT"
-                        onPress={handleExit}
-                        style={styles.exitBtn}
-                        textStyle={{ fontSize: 10 }}
-                        gradientColors={['#ff3355', '#cc0022']}
+            <View style={styles.screenWrapper}>
+                {/* Desktop Sidebar */}
+                {(isDesktop || isTablet) && (
+                    <AstronautSidebar
+                        username={currentUser?.username || 'Astronaut'}
+                        roomId={roomId || '0000'}
+                        isHost={isHost}
+                        onExit={handleExit}
+                        isCollapsed={isSidebarCollapsed}
+                        onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
                     />
-
-                    {status === 'playing' && (
-                        <View style={styles.headerCenter}>
-                            <Text style={styles.statsLabel}>QUESTIONS</Text>
-                            <Text style={styles.statsValue}>{Math.max(0, (maxQuestions * players.length) - questionCount)}</Text>
-                        </View>
-                    )}
-
-                    {status === 'playing' && (
-                        <View style={styles.headerCenter}>
-                            <Text style={styles.statsLabel}>YOUR GUESSES</Text>
-                            <Text style={[styles.statsValue, { color: '#FFCC00', textShadowColor: '#FFCC00' }]}>
-                                {3 - (guessCounts[userId || ''] || 0)}
-                            </Text>
-                        </View>
-                    )}
-
-                    <View style={styles.playersContainer}>
-                        {players.map(p => {
-                            const isGameHost = p.is_host && gameMode === 'HOST';
-                            const used = messages.filter(m => m.user_id === p.id && m.type === 'question').length;
-                            return (
-                                <PlayerAvatar
-                                    key={p.id}
-                                    username={p.username}
-                                    isActive={currentTurn === p.id}
-                                    isHost={p.is_host}
-                                    isMe={p.id === userId}
-                                    remaining={isGameHost ? undefined : Math.max(0, maxQuestions - used)}
-                                    guessCount={isGameHost ? undefined : (guessCounts[p.id] || 0)}
-                                    onKick={isHost && !p.is_host ? () => handleKick(p.id) : undefined}
-                                />
-                            );
-                        })}
-                    </View>
-                </View>
-
-                {/* Chat Area */}
-                <FlatList
-                    ref={flatListRef}
-                    data={messages.filter(m => !m.visible_to || m.visible_to === userId)}
-                    keyExtractor={(item) => item.id}
-                    renderItem={({ item }) => <ChatBubble message={item} isOwnMsg={item.user_id === userId} />}
-                    contentContainerStyle={styles.chatList}
-                    onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-                />
-
-                {/* Controls Area */}
-                {status === 'lobby' ? (
-                    <View style={styles.controlArea}>
-                        <Text style={styles.waitingText}>Awaiting Mission Start...</Text>
-                        {isHost && <NeonButton title="Initiate Sequence" onPress={handleStartGame} />}
-                    </View>
-                ) : status === 'finished' ? (
-                    <View style={styles.controlArea}>
-                        <Text style={styles.waitingText}>Mission Debug Finished.</Text>
-                        {isHost && <NeonButton title="Prepare New Mission" onPress={handlePlayAgain} />}
-                    </View>
-                ) : awaitingHost && isHost ? (
-                    <View style={styles.hostControlPanel}>
-                        <Text style={styles.hostPrompt}>A player asked a question. Choose your answer:</Text>
-                        <View style={styles.hostButtonsContainer}>
-                            <NeonButton title="YES" onPress={() => handleHostAnswer('YES')} style={styles.choiceBtn} gradientColors={['#00ff66', '#00cc55']} />
-                            <NeonButton title="NO" onPress={() => handleHostAnswer('NO')} style={styles.choiceBtn} gradientColors={['#ff0055', '#cc0044']} />
-                            <NeonButton title="MAYBE" onPress={() => handleHostAnswer('MAYBE')} style={styles.choiceBtn} />
-                        </View>
-                    </View>
-                ) : isHost && gameMode === 'HOST' ? (
-                    <View style={styles.hostStatusPanel}>
-                        <Text style={styles.hostStatusText}>You are the Mission Controller. Monitor the comms and wait for the next question.</Text>
-                    </View>
-                ) : (
-                    <View style={[styles.inputContainer, (!myTurn || awaitingHost) && styles.disabledInput]}>
-                        <View style={styles.modeToggle}>
-                            <Text
-                                style={[styles.modeText, !isGuessMode && styles.activeMode]}
-                                onPress={() => setIsGuessMode(false)}>ASK</Text>
-                            <Text style={styles.modeDivider}>|</Text>
-                            <Text
-                                style={[styles.modeText, isGuessMode && styles.activeMode]}
-                                onPress={() => setIsGuessMode(true)}>GUESS</Text>
-                        </View>
-                        <View style={styles.row}>
-                            <TextInput
-                                style={styles.textInput}
-                                placeholder={isGuessMode ? "Guess the hidden word..." : "Ask a Yes/No question..."}
-                                placeholderTextColor={colors.textMuted}
-                                value={inputText}
-                                onChangeText={setInputText}
-                                editable={myTurn && !awaitingHost}
-                                onSubmitEditing={handleSend}
-                            />
-                            <NeonButton
-                                title={isGuessMode ? "GUESS" : "SEND"}
-                                onPress={handleSend}
-                                disabled={!myTurn || awaitingHost || !inputText.trim() || (isGuessMode && (guessCounts[userId || ''] || 0) >= 3)}
-                                style={styles.sendBtn}
-                                textStyle={{ fontSize: 14 }}
-                            />
-                        </View>
-                        {!myTurn && !awaitingHost && <Text style={styles.notTurnText}>Waiting for other player's move...</Text>}
-                        {awaitingHost && !isHost && <Text style={styles.notTurnText}>Waiting for host response...</Text>}
-                        {isGuessMode && (guessCounts[userId || ''] || 0) >= 3 && (
-                            <Text style={[styles.notTurnText, { color: '#FF3131' }]}>You have used all your guesses (3/3)!</Text>
-                        )}
-                        {isGuessMode && (guessCounts[userId || ''] || 0) < 3 && (
-                            <Text style={[styles.notTurnText, { color: '#FFCC00' }]}>
-                                Warning: {3 - (guessCounts[userId || ''] || 0)} guesses remaining! Use them wisely.
-                            </Text>
-                        )}
-                    </View>
                 )}
-            </KeyboardAvoidingView>
+
+                <KeyboardAvoidingView
+                    style={[
+                        styles.mainContainer,
+                        isDesktop && { width: isSidebarCollapsed ? width - 80 : width - 260 }
+                    ]}
+                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                >
+                    <MissionHeader />
+
+                    <View style={styles.gameContent}>
+                        {/* Status Messages for Lobby/Finished */}
+                        {status !== 'playing' && (
+                            <View style={styles.overlay}>
+                                <Text style={styles.overlayText}>
+                                    {status === 'lobby' ? 'WAITING FOR CREW INITIATION' : 'MISSION DATA ANALYSIS COMPLETE'}
+                                </Text>
+                                {isHost && (
+                                    <NeonButton
+                                        title={status === 'lobby' ? 'START MISSION' : 'NEW MISSION'}
+                                        onPress={status === 'lobby' ? handleStartGame : handlePlayAgain}
+                                        style={styles.actionBtn}
+                                    />
+                                )}
+                            </View>
+                        )}
+
+                        <FlatList
+                            ref={flatListRef}
+                            data={messages.filter(m => !m.visible_to || m.visible_to === userId)}
+                            keyExtractor={(item) => item.id}
+                            renderItem={({ item }) => <ChatBubble message={item} isOwnMsg={item.user_id === userId} />}
+                            contentContainerStyle={styles.chatList}
+                            onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+                        />
+                    </View>
+
+                    {/* Controls Footer */}
+                    {status === 'playing' && (
+                        <View style={styles.footer}>
+                            {awaitingHost && isHost ? (
+                                <View style={styles.hostPanel}>
+                                    <Text style={styles.hostPrompt}>MISSION COMMANDER: SEND RESPONSE</Text>
+                                    <View style={styles.hostButtons}>
+                                        <NeonButton title="YES" onPress={() => handleHostAnswer('YES')} style={styles.hBtn} gradientColors={['#39FF14', '#28cc10']} />
+                                        <NeonButton title="NO" onPress={() => handleHostAnswer('NO')} style={styles.hBtn} gradientColors={['#FF3131', '#cc2020']} />
+                                        <NeonButton title="MAYBE" onPress={() => handleHostAnswer('MAYBE')} style={styles.hBtn} gradientColors={[colors.primary, colors.secondary]} />
+                                    </View>
+                                </View>
+                            ) : isHost && gameMode === 'HOST' ? (
+                                <View style={styles.hostIdlePanel}>
+                                    <Text style={styles.hostIdleText}>MONITORING SECTOR COMMUNICATIONS...</Text>
+                                </View>
+                            ) : (
+                                <View style={[styles.inputPanel, (!myTurn || awaitingHost) && styles.disabledPanel]}>
+                                    <View style={styles.modeToggle}>
+                                        <Pressable
+                                            style={[styles.modeBtn, !isGuessMode && styles.activeModeBtn]}
+                                            onPress={() => setIsGuessMode(false)}
+                                        >
+                                            <Text style={[styles.modeBtnText, !isGuessMode && styles.activeModeBtnText]}>ASK</Text>
+                                        </Pressable>
+                                        <Pressable
+                                            style={[styles.modeBtn, isGuessMode && styles.activeModeBtn]}
+                                            onPress={() => setIsGuessMode(true)}
+                                        >
+                                            <Text style={[styles.modeBtnText, isGuessMode && styles.activeModeBtnText]}>GUESS</Text>
+                                        </Pressable>
+                                    </View>
+
+                                    <View style={styles.inputRow}>
+                                        <TextInput
+                                            style={styles.terminalInput}
+                                            placeholder={isGuessMode ? "Identify target..." : "Transmit question..."}
+                                            placeholderTextColor="rgba(0, 245, 255, 0.3)"
+                                            value={inputText}
+                                            onChangeText={setInputText}
+                                            editable={myTurn && !awaitingHost}
+                                            onSubmitEditing={handleSend}
+                                        />
+                                        <NeonButton
+                                            title={isGuessMode ? "GUESS" : "SEND"}
+                                            onPress={handleSend}
+                                            disabled={!myTurn || awaitingHost || !inputText.trim() || (isGuessMode && (guessCounts[userId || ''] || 0) >= 3)}
+                                            style={styles.sendBtn}
+                                        />
+                                    </View>
+
+                                    {!myTurn && !awaitingHost && (
+                                        <Text style={styles.statusText}>WAITING FOR OTHER ASTRONAUTS...</Text>
+                                    )}
+                                    {awaitingHost && !isHost && (
+                                        <Text style={styles.statusText}>WAITING FOR MISSION COMMANDER...</Text>
+                                    )}
+                                </View>
+                            )}
+                        </View>
+                    )}
+                </KeyboardAvoidingView>
+            </View>
         </SpaceBackground>
     );
 };
 
 const styles = StyleSheet.create({
-    container: {
-        maxWidth: 1100,
-        alignSelf: 'center',
-        backgroundColor: 'rgba(255,255,255,0.05)',
-        borderRadius: 20,
-        borderWidth: 1,
-        borderColor: 'rgba(0, 255, 255, 0.2)',
-        shadowColor: colors.primary,
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.3,
-        shadowRadius: 20,
-        overflow: 'hidden',
-        flexDirection: 'column',
-    },
-    header: {
-        height: 70,
+    screenWrapper: {
+        flex: 1,
         flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: 20,
-        borderBottomWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
-        backgroundColor: 'rgba(0,0,0,0.3)',
     },
-    headerLeft: {
-        justifyContent: 'center',
+    mainContainer: {
         flex: 1,
+        backgroundColor: 'rgba(5, 8, 22, 0.4)',
     },
-    headerCenter: {
-        alignItems: 'center',
-        justifyContent: 'center',
+    gameContent: {
         flex: 1,
+        position: 'relative',
     },
-    statsLabel: {
-        color: colors.textMuted,
-        fontSize: 8,
-        fontFamily: typography.fontFamily,
-        letterSpacing: 1,
-        marginBottom: 2,
+    overlay: {
+        position: 'absolute',
+        top: 0, left: 0, right: 0, bottom: 0,
+        backgroundColor: 'rgba(5, 8, 22, 0.8)',
+        zIndex: 10,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 40,
     },
-    statsValue: {
+    overlayText: {
         color: colors.primary,
-        fontSize: 18,
-        fontWeight: 'bold',
-        fontFamily: typography.fontFamily,
+        fontSize: 16,
+        fontFamily: typography.titleFont,
+        letterSpacing: 4,
+        textAlign: 'center',
+        marginBottom: 30,
         textShadowColor: colors.primary,
-        textShadowRadius: 5,
+        textShadowRadius: 15,
     },
-    gameTitle: {
-        color: colors.primary,
-        fontFamily: typography.fontFamily,
-        fontSize: 18,
-        fontWeight: 'bold',
-        letterSpacing: 2,
-    },
-    exitBtn: {
-        width: 60,
-        height: 34,
-        marginVertical: 0,
-        marginLeft: 10,
-    },
-    roomText: {
-        color: colors.textMuted,
-        fontFamily: typography.fontFamily,
-        fontSize: 12,
-        marginTop: 2,
-    },
-    roomHighlight: {
-        color: colors.primary,
-        fontWeight: 'bold',
-        letterSpacing: 2,
-    },
-    playersContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
+    actionBtn: {
+        width: 240,
     },
     chatList: {
-        padding: 25,
+        padding: 20,
         paddingBottom: 40,
     },
-    controlArea: {
-        padding: 20,
-        alignItems: 'center',
-        paddingBottom: 30,
-    },
-    waitingText: {
-        color: colors.textMuted,
-        fontFamily: typography.fontFamily,
-        marginBottom: 20,
-        fontStyle: 'italic',
-    },
-    disabledInput: {
-        opacity: 0.6,
-    },
-    inputContainer: {
-        padding: 15,
-        backgroundColor: 'rgba(0,0,0,0.5)',
+    footer: {
         borderTopWidth: 1,
         borderColor: colors.border,
-        paddingBottom: Platform.OS === 'ios' ? 30 : 15,
-    },
-    modeToggle: {
-        flexDirection: 'row',
-        marginBottom: 10,
-        marginLeft: 5,
-    },
-    modeText: {
-        color: colors.textMuted,
-        fontSize: 12,
-        fontWeight: 'bold',
-    },
-    activeMode: {
-        color: colors.primary,
-    },
-    modeDivider: {
-        color: colors.textMuted,
-        marginHorizontal: 10,
-        fontSize: 12,
-    },
-    row: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-    },
-    textInput: {
-        flex: 0.8,
-        backgroundColor: 'rgba(255,255,255,0.05)',
-        borderWidth: 1,
-        borderColor: colors.border,
-        borderRadius: 8,
-        color: colors.text,
-        padding: 12,
-        marginRight: 10,
-        fontFamily: typography.fontFamily,
-    },
-    sendBtn: {
-        flex: 0.2,
-        marginVertical: 0,
-        paddingVertical: 12,
-        paddingHorizontal: 0,
-    },
-    notTurnText: {
-        color: colors.accent,
-        fontSize: 12,
-        textAlign: 'center',
-        marginTop: 10,
-        fontFamily: typography.fontFamily,
-    },
-    hostControlPanel: {
+        backgroundColor: 'rgba(5, 8, 22, 0.9)',
         padding: 20,
-        backgroundColor: 'rgba(0,0,0,0.6)',
-        borderTopWidth: 1,
-        borderColor: colors.primary,
+    },
+    hostPanel: {
         alignItems: 'center',
     },
     hostPrompt: {
-        color: colors.text,
-        fontSize: 14,
-        fontFamily: typography.fontFamily,
+        color: colors.primary,
+        fontSize: 10,
+        fontFamily: typography.titleFont,
+        letterSpacing: 2,
         marginBottom: 15,
-        fontWeight: 'bold',
     },
-    hostButtonsContainer: {
+    hostButtons: {
         flexDirection: 'row',
-        justifyContent: 'space-around',
         width: '100%',
+        gap: 10,
     },
-    choiceBtn: {
+    hBtn: {
         flex: 1,
-        marginHorizontal: 5,
-        marginVertical: 0,
+    },
+    hostIdlePanel: {
+        alignItems: 'center',
         paddingVertical: 10,
     },
-    hostStatusPanel: {
-        padding: 20,
-        backgroundColor: 'rgba(0,0,0,0.4)',
-        borderTopWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
-        alignItems: 'center',
-        paddingBottom: 30,
-    },
-    hostStatusText: {
+    hostIdleText: {
         color: colors.primary,
-        fontSize: 13,
-        fontFamily: typography.fontFamily,
-        fontStyle: 'italic',
+        fontSize: 10,
+        fontFamily: typography.titleFont,
+        letterSpacing: 2,
+        opacity: 0.6,
+    },
+    inputPanel: {
+        width: '100%',
+    },
+    disabledPanel: {
+        opacity: 0.5,
+    },
+    modeToggle: {
+        flexDirection: 'row',
+        backgroundColor: colors.surface,
+        borderRadius: 4,
+        padding: 2,
+        marginBottom: 12,
+        alignSelf: 'flex-start',
+    },
+    modeBtn: {
+        paddingHorizontal: 16,
+        paddingVertical: 4,
+        borderRadius: 4,
+    },
+    activeModeBtn: {
+        backgroundColor: colors.primary,
+    },
+    modeBtnText: {
+        color: colors.textMuted,
+        fontSize: 9,
+        fontWeight: 'bold',
+        fontFamily: typography.titleFont,
+    },
+    activeModeBtnText: {
+        color: colors.background,
+    },
+    inputRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    terminalInput: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.4)',
+        borderWidth: 1,
+        borderColor: colors.border,
+        borderRadius: 4,
+        color: colors.primary,
+        padding: 12,
+        fontFamily: typography.monoFont,
+        fontSize: 14,
+    },
+    sendBtn: {
+        width: 100,
+        marginVertical: 0,
+    },
+    statusText: {
+        color: colors.accent,
+        fontSize: 9,
+        fontFamily: typography.titleFont,
         textAlign: 'center',
-        opacity: 0.8,
+        marginTop: 10,
+        letterSpacing: 1,
     }
 });

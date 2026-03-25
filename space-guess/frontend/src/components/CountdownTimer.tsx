@@ -5,7 +5,7 @@ import { colors, typography } from '../theme/colors';
 import { apiClient } from '../services/api';
 
 export const CountdownTimer: React.FC = () => {
-    const { timerValue, setTimerValue, currentTurn, userId, roomId, status, awaitingHost, isHost } = useGameStore();
+    const { timerValue, setTimerValue, timerResetKey, status, roomId, userId, currentTurn, awaitingHost, isHost } = useGameStore();
 
     useEffect(() => {
         if (status !== 'playing') return;
@@ -21,10 +21,10 @@ export const CountdownTimer: React.FC = () => {
         return () => clearInterval(interval);
     }, [timerValue, status]);
 
-    // Reset timer on turn change or host response
+    // Reset timer on key change
     useEffect(() => {
         setTimerValue(60);
-    }, [currentTurn, awaitingHost]);
+    }, [timerResetKey]);
 
     const handleTimeout = async () => {
         if (!roomId || !userId) return;

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, TextInput, Text, Switch, useWindowDimensions, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { StyleSheet, View, TextInput, Text, Switch, useWindowDimensions, KeyboardAvoidingView, Platform, ScrollView, Pressable } from 'react-native';
 import { SpaceBackground } from '../components/SpaceBackground';
 import { NeonButton } from '../components/NeonButton';
 import { useGameStore } from '../store/gameStore';
@@ -23,7 +23,18 @@ export const LobbyScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     const { setRoomInfo, setPlayers } = useGameStore();
 
     const handleCreate = async () => {
-        if (!username) return alert('Enter A Username');
+        if (!username.trim()) return alert('PLEASE IDENTIFY YOURSELF (ASTRONAUT NAME REQUIRED)');
+
+        const currentMode = isSinglePlayer ? 'AI' : gameMode;
+
+        if (currentMode === 'AI' && !category) {
+            return alert('SELECT TARGET SECTOR: ACTORS, ATHLETES, OR SCIENTISTS');
+        }
+
+        if (currentMode === 'HOST' && !customWord.trim()) {
+            return alert('SECURITY CLEARANCE REQUIRED: ENTER ENCRYPTED WORD FOR CREW');
+        }
+
         try {
             const { data } = await apiClient.post('/room/create', {
                 host_username: username,
@@ -40,7 +51,6 @@ export const LobbyScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
             setPlayers([{ id: data.user_id, username, is_host: true }]);
 
             if (isSinglePlayer) {
-                // Auto-start for solo missions
                 await apiClient.post('/game/start', {
                     room_id: data.room_id,
                     user_id: data.user_id
@@ -77,44 +87,46 @@ export const LobbyScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                 style={[
                     styles.container,
                     {
-                        width: isDesktop ? '70%' : '95%',
-                        height: isDesktop ? height * 0.9 : '100%',
-                        marginTop: isDesktop ? height * 0.05 : Platform.OS === 'ios' ? 40 : 0,
+                        width: isDesktop ? 600 : '95%',
+                        height: isDesktop ? 'auto' : '100%',
+                        marginTop: isDesktop ? height * 0.1 : Platform.OS === 'ios' ? 40 : 0,
+                        maxHeight: isDesktop ? height * 0.8 : '100%',
                     }
                 ]}
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             >
                 <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                     <Text style={styles.title}>SPACE GUESS</Text>
+                    <Text style={styles.tagline}>INTERSTELLAR MISSION CONTROL</Text>
 
                     <View style={styles.typeSelector}>
-                        <Text
+                        <Pressable
                             onPress={() => setIsSinglePlayer(true)}
-                            style={[styles.typeButton, isSinglePlayer && styles.typeButtonActive]}
+                            style={[styles.typeBtn, isSinglePlayer && styles.typeBtnActive]}
                         >
-                            SOLO MISSION
-                        </Text>
-                        <Text
+                            <Text style={[styles.typeBtnText, isSinglePlayer && styles.typeBtnTextActive]}>SOLO MISSION</Text>
+                        </Pressable>
+                        <Pressable
                             onPress={() => setIsSinglePlayer(false)}
-                            style={[styles.typeButton, !isSinglePlayer && styles.typeButtonActive]}
+                            style={[styles.typeBtn, !isSinglePlayer && styles.typeBtnActive]}
                         >
-                            CREW MISSION
-                        </Text>
+                            <Text style={[styles.typeBtnText, !isSinglePlayer && styles.typeBtnTextActive]}>CREW MISSION</Text>
+                        </Pressable>
                     </View>
 
                     <TextInput
                         style={styles.input}
-                        placeholder="Astronaut Name"
-                        placeholderTextColor={colors.textMuted}
+                        placeholder="IDENTIFY ASTRONAUT NAME..."
+                        placeholderTextColor="rgba(0, 245, 255, 0.3)"
                         value={username}
                         onChangeText={setUsername}
                     />
 
                     <View style={styles.card}>
-                        <Text style={styles.subtitle}>{isSinglePlayer ? 'Mission Parameters' : 'Initialize Crew Mission'}</Text>
+                        <Text style={styles.cardHeader}>{isSinglePlayer ? 'MISSION PARAMETERS' : 'INITIALIZE CREW MISSION'}</Text>
 
                         <View style={styles.row}>
-                            <Text style={styles.label}>Chances to Guess:</Text>
+                            <Text style={styles.label}>TRANSMISSION LIMIT:</Text>
                             <TextInput
                                 style={styles.smallInput}
                                 keyboardType="numeric"
@@ -124,25 +136,25 @@ export const LobbyScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                         </View>
 
                         <View style={styles.row}>
-                            <Text style={styles.label}>Secret Comms (Hide Qs):</Text>
+                            <Text style={styles.label}>STEALTH COMMS:</Text>
                             <Switch
                                 value={hideQuestions}
                                 onValueChange={setHideQuestions}
-                                trackColor={{ false: colors.textMuted, true: colors.primary }}
+                                trackColor={{ false: 'rgba(255,255,255,0.1)', true: colors.primary }}
                                 thumbColor={colors.text}
                             />
                         </View>
 
                         {!isSinglePlayer && (
                             <View style={styles.row}>
-                                <Text style={styles.label}>Mode (AI / Host):</Text>
+                                <Text style={styles.label}>MODE (AI / HOST):</Text>
                                 <Switch
                                     value={gameMode === 'HOST'}
                                     onValueChange={(val) => {
                                         setGameMode(val ? 'HOST' : 'AI');
                                         if (val) setCategory(null);
                                     }}
-                                    trackColor={{ false: colors.textMuted, true: colors.primary }}
+                                    trackColor={{ false: 'rgba(255,255,255,0.1)', true: colors.primary }}
                                     thumbColor={colors.text}
                                 />
                             </View>
@@ -150,7 +162,7 @@ export const LobbyScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 
                         {(isSinglePlayer || gameMode === 'AI') && (
                             <View style={styles.aiOptions}>
-                                <Text style={styles.label}>AI Subject Category:</Text>
+                                <Text style={styles.subLabel}>TARGET CATEGORY:</Text>
                                 <View style={styles.chipRow}>
                                     {['actors', 'athletes', 'scientists'].map(cat => (
                                         <Text
@@ -163,8 +175,8 @@ export const LobbyScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                                     ))}
                                 </View>
                                 {category && (
-                                    <View style={[styles.row, { marginTop: 10 }]}>
-                                        <Text style={styles.label}>Difficulty:</Text>
+                                    <View style={{ marginTop: 12 }}>
+                                        <Text style={styles.subLabel}>THREAT LEVEL:</Text>
                                         <View style={styles.chipRow}>
                                             {['easy', 'medium', 'hard'].map(diff => (
                                                 <Text
@@ -183,34 +195,39 @@ export const LobbyScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 
                         {!isSinglePlayer && gameMode === 'HOST' && (
                             <TextInput
-                                style={styles.input}
-                                placeholder="Enter Secret Word (Hidden)"
-                                placeholderTextColor={colors.textMuted}
+                                style={[styles.input, { marginTop: 15 }]}
+                                placeholder="ENTER ENCRYPTED WORD..."
+                                placeholderTextColor="rgba(0, 245, 255, 0.3)"
                                 value={customWord}
                                 onChangeText={setCustomWord}
                                 secureTextEntry
                             />
                         )}
 
-                        <View style={styles.buttonContainer}>
-                            <NeonButton title="LAUNCH MISSION" onPress={handleCreate} />
-                        </View>
+                        <NeonButton
+                            title="LAUNCH MISSION"
+                            onPress={handleCreate}
+                            style={{ marginTop: 20 }}
+                        />
                     </View>
 
                     {!isSinglePlayer && (
                         <View style={styles.card}>
-                            <Text style={styles.subtitle}>Join Crew Mission</Text>
+                            <Text style={styles.cardHeader}>JOIN ACTIVE CREW</Text>
                             <TextInput
                                 style={styles.input}
-                                placeholder="Room ID"
-                                placeholderTextColor={colors.textMuted}
+                                placeholder="ENTER SECTOR ID..."
+                                placeholderTextColor="rgba(0, 245, 255, 0.3)"
                                 value={roomId}
                                 onChangeText={setJoinRoomId}
                                 autoCapitalize="characters"
                             />
-                            <View style={styles.buttonContainer}>
-                                <NeonButton title="JOIN CREW" onPress={handleJoin} />
-                            </View>
+                            <NeonButton
+                                title="SYNC WITH CREW"
+                                onPress={handleJoin}
+                                style={{ marginTop: 10 }}
+                                gradientColors={[colors.accent, colors.secondary]}
+                            />
                         </View>
                     )}
                 </ScrollView>
@@ -221,145 +238,153 @@ export const LobbyScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 
 const styles = StyleSheet.create({
     container: {
-        maxWidth: 1100,
         alignSelf: 'center',
-        backgroundColor: 'rgba(255,255,255,0.05)',
-        borderRadius: 20,
+        backgroundColor: 'rgba(5, 8, 22, 0.85)',
+        borderRadius: 4,
         borderWidth: 1,
-        borderColor: 'rgba(0, 255, 255, 0.2)',
-        shadowColor: colors.primary,
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.3,
-        shadowRadius: 20,
+        borderColor: colors.border,
         overflow: 'hidden',
     },
     scrollContent: {
-        justifyContent: 'center',
         padding: 30,
         flexGrow: 1,
     },
     title: {
-        fontSize: 32,
+        fontSize: 36,
         color: colors.primary,
         fontWeight: 'bold',
         textAlign: 'center',
-        marginBottom: 10,
-        fontFamily: typography.fontFamily,
+        fontFamily: typography.titleFont,
+        letterSpacing: 4,
         textShadowColor: colors.primary,
-        textShadowOffset: { width: 0, height: 0 },
-        textShadowRadius: 10,
+        textShadowRadius: 15,
+    },
+    tagline: {
+        fontSize: 10,
+        color: colors.textMuted,
+        textAlign: 'center',
+        fontFamily: typography.monoFont,
+        letterSpacing: 2,
+        marginBottom: 30,
     },
     typeSelector: {
         flexDirection: 'row',
-        backgroundColor: 'rgba(0,0,0,0.3)',
-        borderRadius: 10,
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        borderRadius: 4,
         padding: 4,
         marginBottom: 20,
     },
-    typeButton: {
+    typeBtn: {
         flex: 1,
-        textAlign: 'center',
         paddingVertical: 10,
-        color: colors.textMuted,
-        fontSize: 12,
-        fontWeight: 'bold',
-        fontFamily: typography.fontFamily,
-        borderRadius: 8,
+        alignItems: 'center',
+        borderRadius: 4,
     },
-    typeButtonActive: {
+    typeBtnActive: {
         backgroundColor: colors.primary,
-        color: '#000',
+    },
+    typeBtnText: {
+        color: colors.textMuted,
+        fontSize: 10,
+        fontFamily: typography.titleFont,
+        letterSpacing: 1,
+    },
+    typeBtnTextActive: {
+        color: colors.background,
     },
     card: {
-        backgroundColor: colors.surface,
-        padding: 15,
-        borderRadius: 12,
+        backgroundColor: 'rgba(255,255,255,0.03)',
+        padding: 20,
+        borderRadius: 4,
         borderWidth: 1,
-        borderColor: colors.border,
-        marginBottom: 15,
+        borderColor: 'rgba(255,255,255,0.1)',
+        marginBottom: 20,
     },
-    subtitle: {
-        color: colors.text,
-        fontSize: 16,
-        fontWeight: 'bold',
-        marginBottom: 10,
-        fontFamily: typography.fontFamily,
+    cardHeader: {
+        color: colors.primary,
+        fontSize: 12,
+        fontFamily: typography.titleFont,
+        letterSpacing: 2,
+        marginBottom: 20,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(0, 245, 255, 0.2)',
+        paddingBottom: 8,
     },
     row: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 10,
+        marginBottom: 15,
     },
     label: {
+        color: colors.text,
+        fontSize: 11,
+        fontFamily: typography.titleFont,
+        letterSpacing: 1,
+    },
+    subLabel: {
         color: colors.textMuted,
-        fontSize: 14,
-        fontFamily: typography.fontFamily,
+        fontSize: 10,
+        fontFamily: typography.monoFont,
+        marginBottom: 8,
     },
     input: {
-        backgroundColor: 'rgba(0,0,0,0.3)',
-        borderRadius: 8,
+        backgroundColor: 'rgba(0,0,0,0.4)',
+        borderRadius: 4,
         borderWidth: 1,
         borderColor: colors.border,
-        color: colors.text,
+        color: colors.primary,
         padding: 12,
-        marginBottom: 10,
-        fontFamily: typography.fontFamily,
+        marginBottom: 15,
+        fontFamily: typography.monoFont,
+        fontSize: 14,
     },
     smallInput: {
-        backgroundColor: 'rgba(0,0,0,0.3)',
-        borderRadius: 8,
+        backgroundColor: 'rgba(0,0,0,0.4)',
+        borderRadius: 4,
         borderWidth: 1,
         borderColor: colors.border,
-        color: colors.text,
-        padding: 10,
+        color: colors.primary,
+        padding: 8,
         width: 60,
         textAlign: 'center',
-        fontFamily: typography.fontFamily,
-    },
-    buttonContainer: {
-        width: '100%',
-        alignSelf: 'center',
-        marginTop: 5,
+        fontFamily: typography.monoFont,
     },
     aiOptions: {
-        marginTop: 10,
-        padding: 10,
-        backgroundColor: 'rgba(0,0,0,0.2)',
-        borderRadius: 8,
+        padding: 15,
+        backgroundColor: 'rgba(0,0,0,0.3)',
+        borderRadius: 4,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.05)',
     },
     chipRow: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        marginTop: 5,
+        gap: 8,
     },
     chip: {
-        paddingVertical: 5,
-        paddingHorizontal: 10,
-        borderRadius: 15,
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        borderRadius: 2,
         borderWidth: 1,
-        borderColor: colors.border,
+        borderColor: 'rgba(255,255,255,0.1)',
         color: colors.textMuted,
-        fontSize: 10,
-        marginRight: 8,
-        marginBottom: 5,
-        fontFamily: typography.fontFamily,
+        fontSize: 9,
+        fontFamily: typography.titleFont,
     },
     smallChip: {
-        paddingVertical: 3,
-        paddingHorizontal: 8,
-        borderRadius: 10,
+        paddingVertical: 4,
+        paddingHorizontal: 10,
+        borderRadius: 2,
         borderWidth: 1,
-        borderColor: colors.border,
+        borderColor: 'rgba(255,255,255,0.1)',
         color: colors.textMuted,
         fontSize: 8,
-        marginLeft: 8,
-        fontFamily: typography.fontFamily,
+        fontFamily: typography.titleFont,
     },
     activeChip: {
-        backgroundColor: colors.primary,
+        backgroundColor: 'rgba(0, 245, 255, 0.15)',
         borderColor: colors.primary,
-        color: '#000',
-        fontWeight: 'bold',
+        color: colors.primary,
     }
 });
