@@ -14,7 +14,7 @@ export const GameRoomScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
     const {
         roomId, userId, isHost, players, messages, status, currentTurn, awaitingHost, gameMode,
         guessCounts, addMessages, setStatus, setTurn, setGameOver, reset, resetForNewGame,
-        triggerTimerReset, setIsSubmitting, isSubmitting
+        triggerTimerReset, setIsSubmitting, isSubmitting, isAiThinking, setIsAiThinking
     } = useGameStore();
 
     const [inputText, setInputText] = useState('');
@@ -97,6 +97,9 @@ export const GameRoomScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
         setInputText('');
 
         try {
+            if (!isGuessMode && gameMode === 'AI') {
+                setIsAiThinking(true);
+            }
             await apiClient.post(path, body);
             triggerTimerReset();
         } catch (e: any) {
@@ -104,6 +107,7 @@ export const GameRoomScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
             setInputText(text);
         } finally {
             setIsSubmitting(false);
+            setIsAiThinking(false);
             setTimeout(() => inputRef.current?.focus(), 100);
         }
     };
@@ -206,6 +210,7 @@ export const GameRoomScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
                             data={messages.filter(m => !m.visible_to || m.visible_to === userId)}
                             keyExtractor={(item) => item.id}
                             renderItem={({ item }) => <ChatBubble message={item} isOwnMsg={item.user_id === userId} />}
+                            ListFooterComponent={isAiThinking ? <ChatBubble isLoading={true} /> : null}
                             contentContainerStyle={styles.chatList}
                             onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
                         />

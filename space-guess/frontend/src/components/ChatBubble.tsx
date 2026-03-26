@@ -5,12 +5,43 @@ import { colors, typography } from '../theme/colors';
 import { ChatMessage, useGameStore } from '../store/gameStore';
 
 interface Props {
-    message: ChatMessage;
-    isOwnMsg: boolean;
+    message?: ChatMessage;
+    isOwnMsg?: boolean;
+    isLoading?: boolean;
 }
 
-export const ChatBubble: React.FC<Props> = ({ message, isOwnMsg }) => {
+export const ChatBubble: React.FC<Props> = ({ message, isOwnMsg, isLoading }) => {
     const { userColors } = useGameStore();
+
+    if (isLoading) {
+        return (
+            <Animated.View
+                entering={FadeInDown.springify().damping(12)}
+                style={[styles.container, styles.aiContainer, { opacity: 0.8 }]}
+            >
+                <View style={styles.header}>
+                    <Text style={[styles.username, { color: colors.primary }]}>
+                        ⦿ AI
+                    </Text>
+                    <View style={[styles.pulse, { backgroundColor: colors.primary }]} />
+                </View>
+                <View style={styles.loadingContainer}>
+                    <Text style={[styles.messageText, styles.aiMessageText, { opacity: 0.6 }]}>
+                        ANALYZING TRANSMISSION...
+                    </Text>
+                    <View style={styles.loadingDots}>
+                        {/* Simple CSS-like dots using standard views for demo */}
+                        <View style={[styles.dot, { backgroundColor: colors.primary }]} />
+                        <View style={[styles.dot, { backgroundColor: colors.primary, opacity: 0.6 }]} />
+                        <View style={[styles.dot, { backgroundColor: colors.primary, opacity: 0.3 }]} />
+                    </View>
+                </View>
+            </Animated.View>
+        );
+    }
+
+    if (!message) return null;
+
     const isAI = message.username === 'AI' || message.username === 'HOST';
     const isSystem = message.type === 'system';
     const isGuess = message.type === 'guess';
@@ -165,5 +196,20 @@ const styles = StyleSheet.create({
         width: '30%',
         marginTop: 8,
         alignSelf: 'flex-start',
+    },
+    loadingContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 10,
+    },
+    loadingDots: {
+        flexDirection: 'row',
+        marginTop: 8,
+        gap: 6,
+    },
+    dot: {
+        width: 4,
+        height: 4,
+        borderRadius: 2,
     }
 });

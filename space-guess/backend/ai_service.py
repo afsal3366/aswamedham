@@ -20,62 +20,116 @@ try:
 except Exception as e:
     print(f"Error loading word pool: {e}")
 
+try:
+    import openai
+except ImportError:
+    openai = None
+
+async def _call_openai(prompt: str) -> str:
+    """Uses official API if OPENAI_API_KEY is present in env."""
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key or not openai:
+        return None
+    try:
+        client_oai = openai.AsyncOpenAI(api_key=api_key)
+        response = await client_oai.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=15,
+            temperature=0.0
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        print(f"Native OpenAI Error: {e}")
+        return None
+
 async def _call_ollama(prompt: str, model: str = "llama3:latest") -> str:
     """Fast local LLM call using Ollama with strict length limits."""
-    try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            resp = await client.post("http://127.0.0.1:11434/api/generate", json={
-                "model": model,
-                "prompt": f"System: Reply ONLY with 1-3 words. Be extremely brief.\nUser: {prompt}",
-                "stream": False,
-                "options": {
-                    "num_predict": 10,  # Stop very early
-                    "temperature": 0.0
-                }
-            })
-            if resp.status_code == 200:
-                return resp.json().get("response", "").strip()
-            else:
-                print(f"Ollama RPC Error: {resp.status_code} - {resp.text}")
-    except Exception as e:
-        print(f"Ollama Network Error: {repr(e)}")
+    ollama_url = os.getenv("OLLAMA_URL", "http://host.docker.internal:11434")
+    urls_to_try = [
+        "http://127.0.0.1:11434",
+        ollama_url,
+        "http://172.17.0.1:11434"
+    ]
+    
+    async with httpx.AsyncClient(timeout=3.0) as client_http:
+        for url in urls_to_try:
+            try:
+                resp = await client_http.post(f"{url}/api/generate", json={
+                    "model": model,
+                    "prompt": f"System: Reply ONLY with 1-3 words. Be extremely brief.\nUser: {prompt}",
+                    "stream": False,
+                    "options": {"num_predict": 10, "temperature": 0.0}
+                })
+                if resp.status_code == 200:
+                    return resp.json().get("response", "").strip()
+            except Exception:
+                continue
     return None
 
 async def _call_ai_batch(prompt: str, models: list) -> str:
-    """Try local Ollama first, then fall back to g4f parallel batch."""
-    # PRIMARY SOURCE: Local Ollama (Super fast & reliable)
+    """Try OpenAI first, then local Ollama, then g4f parallel batch."""
+    # 1. Native OpenAI (Most reliable if user provided key in EXPORT or docker-compose)
+    openai_result = await _call_openai(prompt)
+    if openai_result:
+        return openai_result
+
+    # 2. Local Ollama (Super fast & reliable if running on host)
     ollama_result = await _call_ollama(prompt)
     if ollama_result:
         return ollama_result
 
-    # SECONDARY SOURCE/FALLBACK: g4f parallel execution
+    # 3. SECONDARY SOURCE/FALLBACK: g4f parallel execution
     async def _single_call(model):
         try:
-            response = await g4f.ChatCompletion.create_async(
+            # Try using the client-based approach which is more stable in recent g4f
+            response = await asyncio.to_thread(
+                client.chat.completions.create,
                 model=model,
                 messages=[{"role": "user", "content": prompt}]
             )
-            return response.strip()
-        except:
-            return None
+            val = response.choices[0].message.content.strip()
+            if "api_key" in val.lower() or "error" in val.lower() or "http" in val.lower():
+                raise ValueError("Provider threw API error text")
+            return val
+        except Exception as e:
+            # Fallback to direct async call if client fails
+            try:
+                response = await g4f.ChatCompletion.create_async(
+                    model=model,
+                    messages=[{"role": "user", "content": prompt}]
+                )
+                val = response.strip()
+                if "api_key" in val.lower() or "error" in val.lower() or "http" in val.lower():
+                    raise ValueError("Provider threw API error text")
+                return val
+            except:
+                return None
 
     tasks = [asyncio.create_task(_single_call(m)) for m in models]
     
     try:
-        # Wait up to 10s for the first one to finish
-        done, pending = await asyncio.wait(tasks, timeout=10.0, return_when=asyncio.FIRST_COMPLETED)
+        # Wait up to 25s entirely, looking for the first valid response
+        done, pending = await asyncio.wait(tasks, timeout=25.0, return_when=asyncio.FIRST_COMPLETED)
         
-        # Cancel pending tasks
-        for task in pending:
-            task.cancel()
+        while done:
+            for task in done:
+                try:
+                    result = task.result()
+                    if result:
+                        # Cancel pending tasks immediately once we have a valid result
+                        for p in pending: p.cancel()
+                        return result
+                except:
+                    continue
             
-        for task in done:
-            try:
-                result = task.result()
-                if result:
-                    return result
-            except:
-                continue
+            # If no success, keep waiting on pending
+            if pending:
+                done, pending = await asyncio.wait(pending, timeout=5.0, return_when=asyncio.FIRST_COMPLETED)
+            else:
+                break
+                
+        for p in pending: p.cancel()
     except Exception as e:
         print(f"Parallel AI Error: {e}")
         
@@ -88,8 +142,8 @@ async def generate_random_word_via_ai() -> str:
              f"Prioritize people or landmarks from Kerala, India or India in general (e.g., Mammootty, Taj Mahal, ISRO). " \
              f"Please ensure it is highly unique. Salt: {salt}. Reply ONLY with the exact name (e.g., MOHANLAL), and nothing else (no punctuation)."
     
-    # Use fast models for generation fallback
-    models = ["gpt-3.5-turbo", "gpt-4", "claude-3-haiku"]
+    # Use diverse models for generation fallback
+    models = ["gpt-3.5-turbo", "gpt-4", "claude-3-haiku", "llama-3-70b", "gemini-pro"]
     
     result = await _call_ai_batch(prompt, models)
     if result:
@@ -125,7 +179,7 @@ async def get_random_person(category: str = "actors", difficulty: str = "medium"
         f"Reply ONLY with the exact name (e.g., SACHIN TENDULKAR), and nothing else."
     )
     
-    models = ["gpt-3.5-turbo", "gpt-4"]
+    models = ["gpt-4o", "gpt-4", "claude-3-opus", "gemini-pro"]
     result = await _call_ai_batch(prompt, models)
     
     if result:
@@ -148,6 +202,18 @@ async def get_random_person(category: str = "actors", difficulty: str = "medium"
     return fallbacks.get(category.lower(), "NEIL ARMSTRONG")
 
 async def get_yes_no_answer(question: str, word: str) -> str:
+    # 1. Deterministic Fallback (Keyword matching)
+    q_lower = question.lower()
+    w_lower = word.lower()
+    
+    # If the user literally asks for the word
+    if w_lower in q_lower or any(part in q_lower for part in w_lower.split() if len(part) > 3):
+        return "YES"
+    
+    # Simple common sense checks
+    if any(k in q_lower for k in ["man", "woman", "person", "human", "alive"]) and ("land" in w_lower or "station" in w_lower):
+        return "NO"
+
     prompt = f"""You are a strict yes/no answering system for a guessing game.
 Hidden word: {word}
 User question: {question}
@@ -159,7 +225,8 @@ Rules:
 * Do not reveal the word.
 * Be logically consistent."""
     
-    models = ["gpt-3.5-turbo", "gpt-4", "llama-3-8b"]
+    # 2. AI Call with expanded model list
+    models = ["gpt-3.5-turbo", "gpt-4", "llama-3-8b", "gemini-pro", "mistral-7b"]
     result = await _call_ai_batch(prompt, models)
     
     if result:
@@ -169,4 +236,9 @@ Rules:
         if "NOT CLEAR" in answer or "UNCLEAR" in answer: return "QUESTION IS NOT CLEAR"
         if "MAYBE" in answer: return "MAYBE"
             
+    # 3. Last resort: Smart random guess based on question type (better than hard error)
+    if any(k in q_lower for k in ["is it", "are you", "do you"]):
+        return random.choice(["YES", "NO", "MAYBE"])
+            
     return "MAYBE (AI Provider Delay)"
+

@@ -34,6 +34,7 @@ export interface GameState {
     timerValue: number;
     timerResetKey: number;
     isSubmitting: boolean;
+    isAiThinking: boolean;
     userColors: Record<string, string>;
     guessCounts: Record<string, number>;
 
@@ -44,6 +45,7 @@ export interface GameState {
     setTimerValue: (val: number) => void;
     triggerTimerReset: () => void;
     setIsSubmitting: (val: boolean) => void;
+    setIsAiThinking: (val: boolean) => void;
     addMessage: (msg: ChatMessage) => void;
     addMessages: (msgs: ChatMessage[]) => void;
     setStatus: (status: 'lobby' | 'playing' | 'finished') => void;
@@ -77,6 +79,7 @@ export const useGameStore = create<GameState>((set) => ({
     guessCounts: {},
     timerResetKey: 0,
     isSubmitting: false,
+    isAiThinking: false,
 
     setRoomInfo: (roomId, userId, username, isHost, maxQ, mode) => set({ roomId, userId, username, isHost, maxQuestions: maxQ, gameMode: mode || 'AI' }),
     setAwaitingHost: (awaiting) => set({ awaitingHost: awaiting }),
@@ -100,6 +103,7 @@ export const useGameStore = create<GameState>((set) => ({
         timerResetKey: state.timerResetKey + 1
     })),
     setIsSubmitting: (val) => set({ isSubmitting: val }),
+    setIsAiThinking: (val) => set({ isAiThinking: val }),
     addMessage: (msg) => set((state) => {
         if (state.messages.find(m => m.id === msg.id)) return state;
         const newMessages = [...state.messages, msg];
