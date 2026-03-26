@@ -8,6 +8,7 @@ import { MissionHeader } from '../components/MissionHeader';
 import { useGameStore } from '../store/gameStore';
 import { apiClient, connectSSE } from '../services/api';
 import { colors, typography } from '../theme/colors';
+import { ShimmerLoader } from '../components/ShimmerLoader';
 
 export const GameRoomScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     const {
@@ -167,6 +168,7 @@ export const GameRoomScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
                         username={currentUser?.username || 'Astronaut'}
                         roomId={roomId || '0000'}
                         isHost={isHost}
+                        players={players}
                         onExit={handleExit}
                         isCollapsed={isSidebarCollapsed}
                         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
@@ -243,20 +245,26 @@ export const GameRoomScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
                                     </View>
 
                                     <View style={styles.inputRow}>
-                                        <TextInput
-                                            ref={inputRef}
-                                            style={styles.terminalInput}
-                                            placeholder={isGuessMode ? "Identify target..." : "Transmit question..."}
-                                            placeholderTextColor="rgba(0, 245, 255, 0.3)"
-                                            value={inputText}
-                                            onChangeText={setInputText}
-                                            editable={myTurn && !awaitingHost}
-                                            onSubmitEditing={handleSend}
-                                        />
+                                        {isSubmitting ? (
+                                            <View style={{ flex: 1, height: 45, justifyContent: 'center' }}>
+                                                <ShimmerLoader height={35} style={{ borderRadius: 4 }} />
+                                            </View>
+                                        ) : (
+                                            <TextInput
+                                                ref={inputRef}
+                                                style={styles.terminalInput}
+                                                placeholder={isGuessMode ? "Identify target..." : "Transmit question..."}
+                                                placeholderTextColor="rgba(0, 245, 255, 0.3)"
+                                                value={inputText}
+                                                onChangeText={setInputText}
+                                                editable={myTurn && !awaitingHost}
+                                                onSubmitEditing={handleSend}
+                                            />
+                                        )}
                                         <NeonButton
                                             title={isGuessMode ? "GUESS" : "SEND"}
                                             onPress={handleSend}
-                                            disabled={!myTurn || awaitingHost || !inputText.trim() || (isGuessMode && (guessCounts[userId || ''] || 0) >= 3)}
+                                            disabled={!myTurn || awaitingHost || !inputText.trim() || isSubmitting || (isGuessMode && (guessCounts[userId || ''] || 0) >= 3)}
                                             style={styles.sendBtn}
                                         />
                                     </View>

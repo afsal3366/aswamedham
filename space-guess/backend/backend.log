@@ -85,3 +85,46 @@ DEBUG: Rotating Turn - Room: E761B1A3, New Turn: 7bb90329-81c9-447c-bd74-ca97716
 INFO:     127.0.0.1:33928 - "POST /game/skip_turn HTTP/1.1" 200 OK
 DEBUG: Rotating Turn - Room: 250D252A, New Turn: 7afe6011-e500-4cd7-bd7e-dfd3a96b72b3, Clearing awaiting_host
 INFO:     127.0.0.1:45720 - "POST /game/question HTTP/1.1" 200 OK
+DEBUG: Rotating Turn - Room: 2C301545, New Turn: e1062803-d404-4821-848e-bbcc61d06505, Clearing awaiting_host
+INFO:     127.0.0.1:49692 - "POST /game/skip_turn HTTP/1.1" 200 OK
+DEBUG: Rotating Turn - Room: E761B1A3, New Turn: 7bb90329-81c9-447c-bd74-ca97716562c0, Clearing awaiting_host
+INFO:     127.0.0.1:36786 - "POST /game/skip_turn HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38724 - "OPTIONS /game/skip_turn HTTP/1.1" 200 OK
+DEBUG: Rotating Turn - Room: 250D252A, New Turn: 7afe6011-e500-4cd7-bd7e-dfd3a96b72b3, Clearing awaiting_host
+INFO:     127.0.0.1:38734 - "POST /game/skip_turn HTTP/1.1" 200 OK
+DEBUG: Rotating Turn - Room: 2C301545, New Turn: e1062803-d404-4821-848e-bbcc61d06505, Clearing awaiting_host
+INFO:     127.0.0.1:38990 - "POST /game/skip_turn HTTP/1.1" 200 OK
+DEBUG: Rotating Turn - Room: E761B1A3, New Turn: 7bb90329-81c9-447c-bd74-ca97716562c0, Clearing awaiting_host
+INFO:     127.0.0.1:46406 - "POST /game/skip_turn HTTP/1.1" 200 OK
+DEBUG: Rotating Turn - Room: 250D252A, New Turn: 7afe6011-e500-4cd7-bd7e-dfd3a96b72b3, Clearing awaiting_host
+INFO:     127.0.0.1:34552 - "POST /game/skip_turn HTTP/1.1" 200 OK
+DEBUG: Rotating Turn - Room: 2C301545, New Turn: e1062803-d404-4821-848e-bbcc61d06505, Clearing awaiting_host
+INFO:     127.0.0.1:55660 - "POST /game/skip_turn HTTP/1.1" 200 OK
+DEBUG: Rotating Turn - Room: E761B1A3, New Turn: 7bb90329-81c9-447c-bd74-ca97716562c0, Clearing awaiting_host
+INFO:     127.0.0.1:41726 - "POST /game/skip_turn HTTP/1.1" 200 OK
+DEBUG: Rotating Turn - Room: 250D252A, New Turn: 7afe6011-e500-4cd7-bd7e-dfd3a96b72b3, Clearing awaiting_host
+INFO:     127.0.0.1:50706 - "POST /game/skip_turn HTTP/1.1" 200 OK
+DEBUG: Rotating Turn - Room: 2C301545, New Turn: e1062803-d404-4821-848e-bbcc61d06505, Clearing awaiting_host
+INFO:     127.0.0.1:51358 - "POST /game/skip_turn HTTP/1.1" 200 OK
+DEBUG: Rotating Turn - Room: E761B1A3, New Turn: 7bb90329-81c9-447c-bd74-ca97716562c0, Clearing awaiting_host
+INFO:     127.0.0.1:51094 - "POST /game/skip_turn HTTP/1.1" 200 OK
+DEBUG: Rotating Turn - Room: 250D252A, New Turn: 7afe6011-e500-4cd7-bd7e-dfd3a96b72b3, Clearing awaiting_host
+INFO:     127.0.0.1:55806 - "POST /game/skip_turn HTTP/1.1" 200 OK
+DEBUG: Rotating Turn - Room: 2C301545, New Turn: e1062803-d404-4821-848e-bbcc61d06505, Clearing awaiting_host
+INFO:     127.0.0.1:54002 - "POST /game/skip_turn HTTP/1.1" 200 OK
+DEBUG: Rotating Turn - Room: E761B1A3, New Turn: 7bb90329-81c9-447c-bd74-ca97716562c0, Clearing awaiting_host
+INFO:     127.0.0.1:36234 - "POST /game/skip_turn HTTP/1.1" 200 OK
+DEBUG: Rotating Turn - Room: 2C301545, New Turn: e1062803-d404-4821-848e-bbcc61d06505, Clearing awaiting_host
+INFO:     127.0.0.1:57956 - "POST /game/skip_turn HTTP/1.1" 200 OK
+DEBUG: Rotating Turn - Room: E761B1A3, New Turn: 7bb90329-81c9-447c-bd74-ca97716562c0, Clearing awaiting_host
+INFO:     127.0.0.1:49200 - "POST /game/skip_turn HTTP/1.1" 200 OK
+DEBUG: Rotating Turn - Room: 2C301545, New Turn: e1062803-d404-4821-848e-bbcc61d06505, Clearing awaiting_host
+INFO:     127.0.0.1:41614 - "POST /game/skip_turn HTTP/1.1" 200 OK
+DEBUG: Rotating Turn - Room: E761B1A3, New Turn: 7bb90329-81c9-447c-bd74-ca97716562c0, Clearing awaiting_host
+INFO:     127.0.0.1:57368 - "POST /game/skip_turn HTTP/1.1" 200 OK
+DEBUG: Rotating Turn - Room: 2C301545, New Turn: e1062803-d404-4821-848e-bbcc61d06505, Clearing awaiting_host
+INFO:     127.0.0.1:58738 - "POST /game/skip_turn HTTP/1.1" 200 OK
+DEBUG: Rotating Turn - Room: E761B1A3, New Turn: 7bb90329-81c9-447c-bd74-ca97716562c0, Clearing awaiting_host
+INFO:     127.0.0.1:55534 - "POST /game/skip_turn HTTP/1.1" 200 OK
+DEBUG: Rotating Turn - Room: 2C301545, New Turn: e1062803-d404-4821-848e-bbcc61d06505, Clearing awaiting_host
+INFO:     127.0.0.1:50804 - "POST /game/skip_turn HTTP/1.1" 200 OK

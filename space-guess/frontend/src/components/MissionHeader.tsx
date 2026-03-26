@@ -6,7 +6,7 @@ import { CountdownTimer } from './CountdownTimer';
 
 export const MissionHeader: React.FC = () => {
     const {
-        roomId, status, maxQuestions, questionCount, players, userId, guessCounts
+        roomId, status, maxQuestions, questionCount, players, userId, guessCounts, gameMode
     } = useGameStore();
 
     if (status !== 'playing') {
@@ -20,7 +20,9 @@ export const MissionHeader: React.FC = () => {
         );
     }
 
-    const remainingQuestions = Math.max(0, maxQuestions - questionCount);
+    const activePlayers = gameMode === 'HOST' ? players.filter(p => !p.is_host).length : players.length;
+    const totalPossible = maxQuestions * (activePlayers || 1);
+    const remainingQuestions = Math.max(0, totalPossible - questionCount);
     const userGuesses = 3 - (guessCounts[userId || ''] || 0);
 
     return (

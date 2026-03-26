@@ -7,7 +7,7 @@ import { useGameStore } from '../store/gameStore';
 import { colors, typography } from '../theme/colors';
 
 export const ResultScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
-    const { word, winner, players, reset, userId } = useGameStore();
+    const { word, winner, players, reset, userId, gameOverReason } = useGameStore();
 
     const winnerData = players.find(p => p.id === winner);
     const isWinner = winner === userId;
@@ -28,7 +28,7 @@ export const ResultScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                     <Text style={styles.title}>MISSION DEBRIEF</Text>
 
                     <View style={styles.statusBadge}>
-                        <Text style={[styles.statusText, { color: winnerData ? colors.primary : colors.error }]}>
+                        <Text style={[styles.statusText, { color: winnerData ? colors.primary : colors.danger }]}>
                             {winnerData ? 'SUCCESS' : 'MISSION FAILURE'}
                         </Text>
                     </View>
@@ -36,13 +36,16 @@ export const ResultScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                     <Text style={styles.resultHeadline}>
                         {winnerData
                             ? (isWinner ? "TARGET NEUTRALIZED" : `${winnerData.username.toUpperCase()} SUCCESSFUL`)
-                            : "DATA LINK LOST"}
+                            : (gameOverReason === 'max_guesses' ? "GUESS CAPACITY EXCEEDED" : "DATA LINK LOST")}
                     </Text>
 
                     <Text style={styles.subtext}>
                         {winnerData
                             ? "The hidden anomaly was successfully identified."
-                            : "The crew exhausted all transmission bandwidth."}
+                            : (gameOverReason === 'max_guesses'
+                                ? "A crew member exhausted their identification attempts. The mission is aborted."
+                                : "The crew exhausted all transmission bandwidth.")
+                        }
                     </Text>
 
                     <Animated.View entering={FadeIn.delay(500).duration(1000)} style={styles.wordBox}>

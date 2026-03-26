@@ -8,13 +8,14 @@ interface Props {
     username: string;
     roomId: string;
     isHost: boolean;
+    players?: any[];
     onExit: () => void;
     isCollapsed?: boolean;
     onToggleCollapse?: () => void;
 }
 
 export const AstronautSidebar: React.FC<Props> = ({
-    username, roomId, isHost, onExit, isCollapsed, onToggleCollapse
+    username, roomId, isHost, players = [], onExit, isCollapsed, onToggleCollapse
 }) => {
     const { width } = useWindowDimensions();
     const isMobile = width < 768;
@@ -42,6 +43,23 @@ export const AstronautSidebar: React.FC<Props> = ({
                         <View style={styles.roomIdBadge}>
                             <Text style={styles.roomIdLabel}>SECTOR:</Text>
                             <Text style={styles.roomIdValue}>{roomId}</Text>
+                        </View>
+                    </View>
+                )}
+
+                {!isCollapsed && players.length > 0 && (
+                    <View style={styles.crewSection}>
+                        <Text style={styles.crewTitle}>CREW MEMBERS</Text>
+                        <View style={styles.crewList}>
+                            {players.map((p) => (
+                                <View key={p.id} style={styles.crewItem}>
+                                    <View style={[styles.statusDot, p.is_host && styles.hostDot]} />
+                                    <View style={styles.crewItemInfo}>
+                                        <Text style={styles.crewName} numberOfLines={1}>{p.username}</Text>
+                                        <Text style={styles.crewRole}>{p.is_host ? 'COMMANDER' : 'MISSION SPECIALIST'}</Text>
+                                    </View>
+                                </View>
+                            ))}
                         </View>
                     </View>
                 )}
@@ -166,5 +184,60 @@ const styles = StyleSheet.create({
         color: colors.textMuted,
         fontSize: 18,
         fontFamily: typography.monoFont,
+    },
+    crewSection: {
+        marginTop: 30,
+        width: '100%',
+        flex: 1,
+    },
+    crewTitle: {
+        color: colors.textMuted,
+        fontSize: 10,
+        fontFamily: typography.monoFont,
+        letterSpacing: 2,
+        marginBottom: 15,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(255,255,255,0.05)',
+        paddingBottom: 5,
+    },
+    crewList: {
+        width: '100%',
+    },
+    crewItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 12,
+        backgroundColor: 'rgba(255,255,255,0.02)',
+        padding: 8,
+        borderRadius: 4,
+    },
+    statusDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: colors.primary,
+        marginRight: 10,
+    },
+    hostDot: {
+        backgroundColor: colors.accent,
+        shadowColor: colors.accent,
+        shadowRadius: 4,
+        shadowOpacity: 0.8,
+    },
+    crewItemInfo: {
+        flex: 1,
+    },
+    crewName: {
+        color: colors.text,
+        fontSize: 12,
+        fontWeight: 'bold',
+        fontFamily: typography.bodyFont,
+        marginBottom: 2,
+    },
+    crewRole: {
+        color: colors.textMuted,
+        fontSize: 8,
+        fontFamily: typography.monoFont,
+        textTransform: 'uppercase',
     }
 });

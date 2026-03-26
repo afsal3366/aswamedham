@@ -30,6 +30,7 @@ export interface GameState {
     questionCount: number;
     gameMode: 'AI' | 'HOST';
     awaitingHost: boolean;
+    gameOverReason: string | null;
     timerValue: number;
     timerResetKey: number;
     isSubmitting: boolean;
@@ -67,6 +68,7 @@ export const useGameStore = create<GameState>((set) => ({
     questionCount: 0,
     gameMode: 'AI',
     awaitingHost: false,
+    gameOverReason: null,
     timerValue: 60,
     userColors: {
         'AI': '#00FF9F',
@@ -122,14 +124,14 @@ export const useGameStore = create<GameState>((set) => ({
     }),
     setStatus: (status) => set({ status }),
     setTurn: (turn) => set({ currentTurn: turn }),
-    setGameOver: (reason, word, winner) => set({ status: 'finished', word, winner: winner || null }),
+    setGameOver: (reason, word, winner) => set({ status: 'finished', gameOverReason: reason, word, winner: winner || null }),
     reset: () => set({
         roomId: null, userId: null, username: '', isHost: false, players: [],
-        messages: [], status: 'lobby', currentTurn: null, word: null, winner: null, gameMode: 'AI', awaitingHost: false, questionCount: 0,
+        messages: [], status: 'lobby', currentTurn: null, word: null, winner: null, gameOverReason: null, gameMode: 'AI', awaitingHost: false, questionCount: 0,
         timerValue: 60, timerResetKey: 0, userColors: { 'AI': '#00FF9F', 'HOST': '#FF00A0' }, guessCounts: {}
     }),
     resetForNewGame: () => set({
-        messages: [], status: 'playing', currentTurn: null, word: null, winner: null, questionCount: 0,
+        messages: [], status: 'playing', currentTurn: null, word: null, winner: null, gameOverReason: null, questionCount: 0,
         awaitingHost: false, timerValue: 60, timerResetKey: 0, guessCounts: {}
     }),
 }));

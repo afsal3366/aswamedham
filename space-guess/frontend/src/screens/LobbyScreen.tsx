@@ -5,6 +5,7 @@ import { NeonButton } from '../components/NeonButton';
 import { useGameStore } from '../store/gameStore';
 import { apiClient } from '../services/api';
 import { colors, typography } from '../theme/colors';
+import { ShimmerLoader } from '../components/ShimmerLoader';
 
 export const LobbyScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     const [username, setUsername] = useState('');
@@ -21,15 +22,13 @@ export const LobbyScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     const isDesktop = width > 768;
 
     const { setRoomInfo, setPlayers } = useGameStore();
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const handleCreate = async () => {
-        if (!username.trim()) return alert('PLEASE IDENTIFY YOURSELF (ASTRONAUT NAME REQUIRED)');
+        if (!username.trim() || isSubmitting) return alert('PLEASE IDENTIFY YOURSELF (ASTRONAUT NAME REQUIRED)');
+        setIsSubmitting(true);
 
         const currentMode = isSinglePlayer ? 'AI' : gameMode;
-
-        if (currentMode === 'AI' && !category) {
-            return alert('SELECT TARGET SECTOR: ACTORS, ATHLETES, OR SCIENTISTS');
-        }
 
         if (currentMode === 'HOST' && !customWord.trim()) {
             return alert('SECURITY CLEARANCE REQUIRED: ENTER ENCRYPTED WORD FOR CREW');
@@ -60,6 +59,8 @@ export const LobbyScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
             navigation.navigate('GameRoom');
         } catch (e) {
             alert('Error creating room');
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -164,7 +165,7 @@ export const LobbyScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                             <View style={styles.aiOptions}>
                                 <Text style={styles.subLabel}>TARGET CATEGORY:</Text>
                                 <View style={styles.chipRow}>
-                                    {['actors', 'athletes', 'scientists'].map(cat => (
+                                    {['actors', 'athletes', 'scientists', 'others'].map(cat => (
                                         <Text
                                             key={cat}
                                             onPress={() => setCategory(category === cat ? null : cat)}
@@ -204,11 +205,18 @@ export const LobbyScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                             />
                         )}
 
-                        <NeonButton
-                            title="LAUNCH MISSION"
-                            onPress={handleCreate}
-                            style={{ marginTop: 20 }}
-                        />
+                        {isSubmitting ? (
+                            <View style={{ marginTop: 20 }}>
+                                <ShimmerLoader height={50} style={{ borderRadius: 4 }} />
+                                <Text style={styles.loadingText}>CALIBRATING MISSION DATA...</Text>
+                            </View>
+                        ) : (
+                            <NeonButton
+                                title="LAUNCH MISSION"
+                                onPress={handleCreate}
+                                style={{ marginTop: 20 }}
+                            />
+                        )}
                     </View>
 
                     {!isSinglePlayer && (
@@ -386,5 +394,14 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(0, 245, 255, 0.15)',
         borderColor: colors.primary,
         color: colors.primary,
+    },
+    loadingText: {
+        color: colors.primary,
+        fontSize: 10,
+        fontFamily: typography.monoFont,
+        textAlign: 'center',
+        marginTop: 8,
+        letterSpacing: 1,
+        opacity: 0.6,
     }
 });
